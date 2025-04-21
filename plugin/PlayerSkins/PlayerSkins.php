@@ -144,7 +144,7 @@ class PlayerSkins extends PluginAbstract
             $images = Video::getImageFromFilename($filename);
             if ($vType == 'video') {
                 $htmlMediaTag = '<video ' . self::getPlaysinline()
-                    . 'preload="auto" poster="' . $images->poster . '" controls controlsList="nodownload"
+                    . 'preload="auto" poster="' . $images->poster . '" controls controlsList="nodownload" crossorigin="anonymous"
                         class="embed-responsive-item video-js vjs-default-skin vjs-big-play-centered vjs-16-9" id="mainVideo">';
                 if ($video['type'] == Video::$videoTypeVideo) {
                     $sources = getSources($video['filename']);
@@ -258,8 +258,9 @@ class PlayerSkins extends PluginAbstract
 
     public function getHeadCode()
     {
+        global $isVideoOrAudioNotEmbedReason;
         global $global, $config, $video;
-        if (isWebRTC() || !empty($global['isForbidden'])) {
+        if (!empty($global['isForbidden'])) {
             return '';
         }
         if (is_object($video)) {
@@ -346,7 +347,7 @@ class PlayerSkins extends PluginAbstract
                             position: relative;
                             left:{$obj->showLogoAdjustLeft};
                             top:{$obj->showLogoAdjustTop};
-                                
+
                             }
                         </style>";
             }
@@ -374,28 +375,35 @@ class PlayerSkins extends PluginAbstract
         $addStartPlayerJS = false;
 
         if ($obj->chromeCast) {
-            if (isVideoOrAudioNotEmbed()) {
+            if (isVideoOrAudioNotEmbed() || isLive()) {
                 $css .= '<link href="' . getURL('node_modules/@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.css') . '" rel="stylesheet" type="text/css"/>';
                 $css .= "<style>.vjs-chromecast-button .vjs-icon-placeholder {width: 20px;height: 20px;}</style>";
                 $js .= '<script>window.SILVERMINE_VIDEOJS_CHROMECAST_CONFIG = {preloadWebComponents: true};</script>';
                 $js .= '<script src="' . getURL('node_modules/@silvermine/videojs-chromecast/dist/silvermine-videojs-chromecast.min.js') . '"></script>';
                 $js .= '<script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1" type="text/javascript"></script>';
                 $onPlayerReady .= 'player.chromecast();player.on(\'play\', function () {player.chromecast();});';
-                $getDataSetup .= ", techOrder: ['chromecast', 'html5'] ";
+                $getDataSetup .= ", techOrder: ['html5'] ";
                 $plugins->chromecast = new stdClass();
                 $addStartPlayerJS = true;
+            }else{
+                $css .= "<!-- chromeCast $isVideoOrAudioNotEmbedReason -->";
+                $js .= "<!-- chromeCast $isVideoOrAudioNotEmbedReason -->";
             }
         }
 
         if ($obj->airPlay) {
-            if (isVideoOrAudioNotEmbed()) {
+            if (isVideoOrAudioNotEmbed() || isLive()) {
                 $css .= '<link href="' . getURL('node_modules/@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.css') . '" rel="stylesheet" type="text/css"/>';
                 $js .= '<script src="' . getURL('node_modules/@silvermine/videojs-airplay/dist/silvermine-videojs-airplay.min.js') . '"></script>';
                 $plugins->airPlay = new stdClass();
                 $plugins->airPlay->addButtonToControlBar = true;
                 $addStartPlayerJS = true;
+            }else{
+                $css .= "<!-- airPlay $isVideoOrAudioNotEmbedReason -->";
+                $js .= "<!-- airPlay $isVideoOrAudioNotEmbedReason -->";
             }
         }
+        $js .= '<script src="' . getURL('plugin/PlayerSkins/events/playerAdsFunctions.js') . '"></script>';
 
         if ($addStartPlayerJS) {
             //var_dump($onPlayerReady, $getDataSetup . ", plugins: " . json_encode($plugins));exit;
@@ -421,7 +429,7 @@ class PlayerSkins extends PluginAbstract
                 include "{$global['systemRootPath']}plugin/PlayerSkins/seo.php";
             }
         }
-         * 
+         *
          */
     }
 
@@ -439,9 +447,6 @@ class PlayerSkins extends PluginAbstract
 
     public function getFooterCode()
     {
-        if (isWebRTC()) {
-            return '';
-        }
         global $global, $config, $getStartPlayerJSWasRequested, $video, $url, $title;
         $js = "<!-- playerSkin -->";
         $obj = $this->getDataObject();
@@ -619,9 +624,6 @@ class PlayerSkins extends PluginAbstract
 
     static function getStartPlayerJSCode($noReadyFunction = false, $currentTime = 0)
     {
-        if (isWebRTC()) {
-            return '';
-        }
         global $config, $global, $prepareStartPlayerJS_onPlayerReady, $prepareStartPlayerJS_getDataSetup, $IMAADTag;
         $obj = AVideoPlugin::getObjectData('PlayerSkins');
         $js = "";
@@ -652,6 +654,7 @@ class PlayerSkins extends PluginAbstract
             player = videojs('mainVideo'" . (self::getDataSetup(implode(" ", $prepareStartPlayerJS_getDataSetup))) . ");";
         //var_dump($IMAADTag, isVideoPlayerHasProgressBar());exit;
         if (!empty($IMAADTag) && isVideoPlayerHasProgressBar()) {
+            $autoPlayAdBreaks = true; // this is to make it work on livestreams
             $adTagOptions = array(
                 'id' => 'mainVideo',
                 'adTagUrl' => $IMAADTag,
@@ -660,10 +663,13 @@ class PlayerSkins extends PluginAbstract
                 // 'useStyledNonLinearAds' => true,
                 'forceNonLinearFullSlot' => true,
                 'adLabel' => __('Advertisement'),
-                // 'autoPlayAdBreaks' => false,
+                'autoPlayAdBreaks' => $autoPlayAdBreaks,
             );
             $js .= PHP_EOL . "adTagOptions = " . json_encode($adTagOptions) . ";" . PHP_EOL;
             $js .= "player.ima(adTagOptions);";
+            if(empty($autoPlayAdBreaks)){
+                $js .= file_get_contents($global['systemRootPath'] . 'plugin/PlayerSkins/events/vmap_ad_scheduler.js') . PHP_EOL;
+            }
             if (isMobile()) {
                 $js .= file_get_contents($global['systemRootPath'] . 'plugin/PlayerSkins/events/playerAdsEventsMobile.js') . PHP_EOL;
             }
@@ -795,16 +801,22 @@ class PlayerSkins extends PluginAbstract
             var time = Math.round(this.currentTime());
             playerCurrentTime = time;
             var url = '{$url}';
-            
+
             if (url.indexOf('?') > -1) {
                 url += '&t=' + time;
             } else {
                 url += '?t=' + time;
             }
-            
+
             $('#linkCurrentTime, .linkCurrentTime').val(url);
-            
+
             sendAVideoMobileMessage('timeupdate', time);
+
+            if (player.liveTracker && player.liveTracker.atLiveEdge()) {
+                if (player.playbackRate() !== 1) {
+                    player.playbackRate(1);
+                }
+            }
         });
         ;";
 
@@ -897,7 +909,7 @@ class PlayerSkins extends PluginAbstract
     }
 
     /**
-     * 
+     *
      * @param array $markersList array(array('timeInSeconds'=>10,'name'=>'abc'),array('timeInSeconds'=>20,'name'=>'abc20'),array('timeInSeconds'=>25,'name'=>'abc25')....);
      * @param int $width
      * @param string $color

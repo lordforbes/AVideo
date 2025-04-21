@@ -127,9 +127,10 @@ class Cache extends PluginAbstract {
             return true;
         }
         $whitelistedFiles = ['user.php', 'status.php', 'canWatchVideo.json.php', '/login', '/status'];
+        $whitelistedScriptName = ['/plugin/Live/index.php'];
         $blacklistedFiles = ['videosAndroid.json.php'];
-        $baseName = basename($_SERVER["SCRIPT_FILENAME"]);
-        if (getVideos_id() || isVideo() || isLive() || isLiveLink() || in_array($baseName, $whitelistedFiles) || in_array($_SERVER['REQUEST_URI'], $whitelistedFiles)) {
+        $baseName = basename($_SERVER["SCRIPT_NAME"]);
+        if (getVideos_id() || isVideo() || isLive() || isLiveLink() || in_array($baseName, $whitelistedFiles) || in_array($_SERVER['REQUEST_URI'], $whitelistedFiles) || in_array($_SERVER['SCRIPT_NAME'], $whitelistedScriptName)) {
             return true;
         }
 
@@ -151,7 +152,7 @@ class Cache extends PluginAbstract {
             $lifetime = $obj->cacheTimeInSeconds;
             if ($isBot && $lifetime < 3600) {
                 $lifetime = 3600;
-            } 
+            }
             */
             if (isBot()) {
                 return 0; // 1 week
@@ -178,7 +179,7 @@ class Cache extends PluginAbstract {
                     $firstPageCache = optimizeHTMLTags($firstPageCache);
                 }
 
-                echo $firstPageCache . PHP_EOL . '<!-- Cached Page Generated in ' . getScriptRunMicrotimeInSeconds() . ' Seconds [' . User::getId() . '] -->';
+                echo $firstPageCache . PHP_EOL . '<!-- Cached Page Generated in ' . getScriptRunMicrotimeInSeconds() . ' Seconds [' . User::getId() . '] '.$_SERVER["SCRIPT_NAME"].' -->';
                 if ($obj->logPageLoadTime) {
                     $this->end("Cache");
                 }
@@ -236,7 +237,7 @@ class Cache extends PluginAbstract {
         if ($obj->logPageLoadTime) {
             $this->end();
         }
-        
+
         //self::saveCache();
     }
 
@@ -408,9 +409,9 @@ class Cache extends PluginAbstract {
                 $maxTimeTolerance = ($created_php_time + $lifetime);
                 $timeNow = time();
                 $isExpired = !empty($lifetime) && $maxTimeTolerance < $timeNow;
-                if ($isExpired) {   
+                if ($isExpired) {
                     $moreInfo = "Lifetime expired = ".($timeNow-$maxTimeTolerance);
-                    //_error_log("getCache($name, $lifetime, $ignoreMetadata) is expired cacheNotFoundCount=$cacheNotFound $moreInfo line=".__LINE__);         
+                    //_error_log("getCache($name, $lifetime, $ignoreMetadata) is expired cacheNotFoundCount=$cacheNotFound $moreInfo line=".__LINE__);
                     $cacheNotFound++;
                 } else if(!$isExpired && !empty($row['content'])) {
                     $_getCacheDB[$index] = _json_decode($row['content']);
@@ -453,7 +454,7 @@ class Cache extends PluginAbstract {
             $sql .= " WHERE created_php_time < {$time} ";
             $sql .= " LIMIT $limit";
             $global['lastQuery'] = $sql;
-    
+
             //return sqlDAL::writeSql($sql, "i", [$days]);
             return sqlDAL::writeSql($sql);
         }
@@ -465,7 +466,7 @@ class Cache extends PluginAbstract {
         $global['systemRootPath'] . 'plugin/Cache/deleteStatistics.json.php';
         self::deleteOldCache(1);
 
-        $rows = Cache_schedule_delete::getAll();        
+        $rows = Cache_schedule_delete::getAll();
         Cache_schedule_delete::truncateTable();
         if (is_iterable($rows)) {
             foreach ($rows as $row) {

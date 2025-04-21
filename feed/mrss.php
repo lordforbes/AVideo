@@ -6,7 +6,8 @@ $cacheFeedName = "feedCacheMRSS" . json_encode($_REQUEST);
 $lifetime = 43200;
 $feed = ObjectYPT::getCache($cacheFeedName, $lifetime);
 $link = "{$link}/mrss";
-if (empty($feed)) {
+$recreate = recreateCache();
+if (empty($feed) || $recreate) {
     _ob_start();
     echo'<?xml version="1.0" encoding="UTF-8"?>'; ?>
     <rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/"
@@ -16,14 +17,14 @@ if (empty($feed)) {
          xmlns:atom="http://www.w3.org/2005/Atom" >
         <channel>
             <atom:link href="<?php echo $global['webSiteRootURL'] . ltrim($_SERVER["REQUEST_URI"], "/"); ?>" rel="self" type="application/rss+xml" />
-            
+
             <title><?php echo feedText($title); ?></title>
             <description><?php echo feedText($description); ?></description>
-            <link><?php echo $global['webSiteRootURL']; ?></link>            
+            <link><?php echo $global['webSiteRootURL']; ?></link>
 
-            <language>en-us</language> 
-            <itunes:image href="<?php echo $logo; ?>" /> 
-            <itunes:explicit>no</itunes:explicit> 
+            <language>en-us</language>
+            <itunes:image href="<?php echo $logo; ?>" />
+            <itunes:explicit>no</itunes:explicit>
 
             <itunes:category text="Technology" />
 
@@ -38,9 +39,9 @@ if (empty($feed)) {
             <?php
             foreach ($rows as $row) {
                 $video = Video::getVideoFromFileName($row['filename']);
-                $files = getVideosURL($row['filename']);
+                $files = getVideosURL($row['filename'], $recreate);
                 $enclosure = '';
-                $videoSource = Video::getSourceFileURL($row['filename']);
+                $videoSource = Video::getSourceFileURL($row['filename'], true);
                 if (empty($videoSource)) {
                     continue;
                 }
@@ -90,11 +91,12 @@ if (empty($feed)) {
     _ob_end_clean();
     //var_dump($cacheFeedName, $feed);exit;
     ObjectYPT::setCache($cacheFeedName, $feed);
-//echo '<!-- NO cache -->';
+    $feedLast = '<!-- NO cache -->';
 } else {
-    //echo '<!-- cache -->';
+    $feedLast = '<!-- cache -->';
 }
 if (!is_string($feed)) {
     $feed = json_encode($feed);
 }
-echo $feed;
+echo $feed.PHP_EOL;
+echo $feedLast;

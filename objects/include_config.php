@@ -1,4 +1,5 @@
 <?php
+global $global, $doNotConnectDatabaseIncludeConfig;
 if (!isset($global['skippPlugins'])) {
     $global['skippPlugins'] = array();
 }
@@ -46,7 +47,7 @@ if($_SERVER["HTTP_HOST"] === 'localhost' || $_SERVER["HTTP_HOST"] === '127.0.0.1
 if (!empty($global['stopBotsList']) && is_array($global['stopBotsList'])) {
     foreach ($global['stopBotsList'] as $value) {
         if (empty($_SERVER['HTTP_USER_AGENT'])) {
-            continue;
+            break;
         }
         if (stripos($_SERVER['HTTP_USER_AGENT'], $value) !== false) {
             if (!empty($global['stopBotsWhiteList']) && is_array($global['stopBotsWhiteList'])) {

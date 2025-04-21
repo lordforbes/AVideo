@@ -99,7 +99,7 @@ function isUntrustedRequest($logMsg = '', $approveAVideoUserAgent = true)
         if ($approveAVideoUserAgent && isAVideoUserAgent()) {
             return false;
         } else {
-            _error_log('isUntrustedRequest: ' . json_encode($logMsg), AVideoLog::$SECURITY);
+            _error_log('isUntrustedRequest: ' . json_encode($logMsg). ' add $global[\'bypassSameDomainCheck\'] = 1 to by pass it' , AVideoLog::$SECURITY);
             return true;
         }
     }
@@ -282,7 +282,7 @@ function isBot($returnTrueIfNoUserAgent=true)
         'google',
         'Expanse'
     ];
-    
+
     // See if one of the identifiers is in the UA string.
     foreach ($bot_identifiers as $identifier) {
         if (stripos($user_agent, $identifier) !== false) {
@@ -308,7 +308,7 @@ function markDownToHTML($text) {
         '<a href="$0" target="_blank" rel="noopener noreferrer">$0</a>',
         $html
     );
-    
+
     // Add classes to images
     $html = preg_replace(
         '/<img([^>]+)>/i',
@@ -335,7 +335,7 @@ function linkifyTimestamps($text) {
         }
 
         // Return the clickable link
-        return "<a href='javascript:void(0)' onclick=\"player.currentTime($seconds);\">$timestamp</a>";
+        return "<a href='javascript:void(0)' onclick=\"console.log('objects-functionsSecurity.php player.currentTime');player.currentTime($seconds);\">$timestamp</a>";
     };
 
     // Replace timestamps with links
@@ -358,7 +358,7 @@ function getAToken()
                 return $obj->atoken;
             }
         }
-    }    
+    }
     if (preg_match('/atoken=\(([a-z0-9=]+)\)/i', $_SERVER['HTTP_USER_AGENT'], $matches)) {
         if (!empty($matches[1])) {
             return $matches[1];
@@ -447,22 +447,22 @@ function includeSecurityChecks() {
 
     // Scan the plugins directory
     $subdirs = scandir($directory);
-    
+
     // Loop through each item in the plugins directory
     foreach ($subdirs as $subdir) {
         // Skip . and .. entries
         if ($subdir === '.' || $subdir === '..') {
             continue;
         }
-        
+
         // Create the full path for each subdirectory
         $subdirPath = $directory . DIRECTORY_SEPARATOR . $subdir;
-        
+
         // Check if it is a directory
         if (is_dir($subdirPath)) {
             // Path to securityCheck.php in the current subdirectory
             $securityCheckFile = $subdirPath . DIRECTORY_SEPARATOR . 'securityCheck.php';
-            
+
             // Check if securityCheck.php exists in the subdirectory
             if (file_exists($securityCheckFile)) {
                 // Include the securityCheck.php file
@@ -531,4 +531,53 @@ function escapeshellcmdURL(string $command)
 {
     return str_replace('\?', '?', escapeshellcmd($command));
 }
+
+function recreateCache(){
+    return (!empty($_REQUEST['recreate']) && !isBot());
+}
+
+function getBearerToken()
+{
+    $headers = [];
+
+    // 1. Try apache_request_headers() if available
+    if (function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+    }
+
+    // 2. If still empty, try getallheaders()
+    if (empty($headers) && function_exists('getallheaders')) {
+        $headers = getallheaders();
+    }
+
+    // 3. If still empty, manually build headers from $_SERVER
+    if (empty($headers)) {
+        foreach ($_SERVER as $key => $value) {
+            if (stripos($key, 'HTTP_') === 0) {
+                // Convert HTTP_HEADER_NAME to Header-Name
+                $headerName = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))));
+                $headers[$headerName] = $value;
+            }
+        }
+    }
+
+    // 4. Normalize and extract Authorization header
+    foreach ($headers as $name => $value) {
+        if (strcasecmp($name, 'Authorization') === 0 && preg_match('/Bearer\s(\S+)/', $value, $matches)) {
+            return $matches[1]; // Return the token
+        }
+    }
+
+    // 5. Final fallback: check $_SERVER directly
+    if (isset($_SERVER['HTTP_AUTHORIZATION']) && preg_match('/Bearer\s(\S+)/', $_SERVER['HTTP_AUTHORIZATION'], $matches)) {
+        return $matches[1];
+    }
+
+    if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION']) && preg_match('/Bearer\s(\S+)/', $_SERVER['REDIRECT_HTTP_AUTHORIZATION'], $matches)) {
+        return $matches[1];
+    }
+
+    return null; // Token not found
+}
+
 

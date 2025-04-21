@@ -318,7 +318,7 @@ abstract class ObjectYPT implements ObjectInterface
                     if (
                         !empty($this->created) && (User::isAdmin() ||
                             isCommandLineInterface() ||
-                            (class_exists('API') && API::isAPISecretValid()) || 
+                            (class_exists('API') && API::isAPISecretValid()) ||
                             !empty($global['allowModifyCreated'])
                         )
                     ) {
@@ -346,7 +346,7 @@ abstract class ObjectYPT implements ObjectInterface
                     }
                 } elseif (strtolower($value) == 'timezone') {
                     if (empty($this->$value)) {
-                        $this->$value = date_default_timezone_get();
+                        eval('$this->' . $value . ' = date_default_timezone_get();');
                     }
                     $formats .= 's';
                     $values[] = $this->$value;
@@ -384,20 +384,22 @@ abstract class ObjectYPT implements ObjectInterface
                     }
                 } elseif (is_string($value) && strtolower($value) == 'timezone') {
                     if (empty($this->$value)) {
-                        $this->$value = date_default_timezone_get();
+                        eval('$this->' . $value . ' = date_default_timezone_get();');
+
                     }
                     $formats .= 's';
                     $values[] = $this->$value;
                     $fields[] = " ? ";
                 } elseif (strtolower($value) == 'created_php_time') {
                     if (empty($this->$value)) {
-                        $this->$value = time();
+                        eval('$this->' . $value . ' = time();');
+
                     }
                     $formats .= 'i';
                     $values[] = $this->$value;
                     $fields[] = " ? ";
                 } elseif (strtolower($value) == 'modified_php_time') {
-                    $this->$value = time();
+                    eval('$this->' . $value . ' = time();');
                     $formats .= 'i';
                     $values[] = $this->$value;
                     $fields[] = " ? ";
@@ -945,7 +947,7 @@ abstract class ObjectYPT implements ObjectInterface
     {
         global $global;
         $tmpDir = self::getCacheDir($name, $createDir, $addSubDirs, $ignoreMetadata);
-        $uniqueHash = sha1($name . $global['salt']); // add salt for security reasons 
+        $uniqueHash = sha1($name . $global['salt']); // add salt for security reasons
         return $tmpDir . $uniqueHash . '_' . getDeviceName('web') . '.cache';
     }
 
@@ -1164,9 +1166,9 @@ abstract class CacheHandler
     public function setCache($value)
     {
         $name = $this->getCacheName($this->suffix);
-        
+
         if(isCommandLineInterface()){
-            echo "public function setCache({$this->suffix}) name=".$name.PHP_EOL;
+            //echo "public function setCache({$this->suffix}) name=".$name.PHP_EOL;
             //echo json_encode(debug_backtrace());
         }
         $return = ObjectYPT::setCacheGlobal($name, $value);
@@ -1185,9 +1187,9 @@ abstract class CacheHandler
             $_getCache = array();
         }
         $this->setSuffix($suffix);
-        $name = $this->getCacheName($this->suffix);        
+        $name = $this->getCacheName($this->suffix);
         if(isCommandLineInterface()){
-            echo "public function getCache($suffix) name=".$name.PHP_EOL;
+            //echo "public function getCache($suffix) name=".$name.PHP_EOL;
             //echo json_encode(debug_backtrace());
         }
         if (isset($_getCache[$name])) {
@@ -1250,7 +1252,7 @@ abstract class CacheHandler
             return true;
         } else {
             $resp = execAsync("rm -R {$dir}");
-            _error_log("deleteCache not schedule {$dir} ".json_encode(debug_backtrace()));
+            _error_log("deleteCache not schedule {$dir} ".json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             return false;
         }
     }

@@ -44,11 +44,11 @@ if (!empty($_GET['u'])) {
             exit;
             /*
             if (count($info['otherLivesSameUser']) == 1) {
-                
+
             } else {
                 // list all lives available
             }
-             * 
+             *
              */
         }
     }
@@ -79,7 +79,11 @@ require_once $global['systemRootPath'] . 'plugin/Live/Objects/LiveTransmition.ph
 
 $users_id = User::getId();
 if (!empty($_GET['users_id']) && User::isAdmin()) {
-    $users_id = intval($_GET['users_id']);
+    $new_users_id = intval($_GET['users_id']);
+    echo "<!-- did change the users_id from $users_id to $new_users_id -->";
+    $users_id = $new_users_id;
+} else {
+    echo "<!-- did not change the users_id = $users_id -->";
 }
 
 // if user already have a key
@@ -166,20 +170,13 @@ include $global['systemRootPath'] . 'view/bootstrap/fileinput.php';
                     if (User::isAdmin()) {
                     ?>
                         <button onclick="avideoModalIframeFullScreen(webSiteRootURL + 'plugin/Live/view/editor.php');" class="btn btn-primary pull-right"><i class="fa fa-edit"></i> Edit Live Servers</button>
-                <?php
+                    <?php
                     }
                 }
                 if (Live::canStreamWithMeet()) {
-                ?>
+                    ?>
                     <button onclick="avideoModalIframeFullScreen(webSiteRootURL + 'plugin/Meet/');" class="btn btn-default pull-right">
                         <i class="fas fa-comments"></i> <span class="hidden-md hidden-sm hidden-xs"><?php echo __("Start a Live Stream Meeting"); ?></span><span class="hidden-lg"><?php echo __("Meeting"); ?></span>
-                    </button>
-                <?php
-                }
-                if (Live::canStreamWithWebRTC()) {
-                ?>
-                    <button onclick="avideoModalIframeFullScreen(webSiteRootURL + 'plugin/Live/webcamFullscreen.php?avideoIframe=1');" class="btn btn-default pull-right" data-toggle="tooltip" title=<?php printJSString(__("Go Live With Webcam")); ?>>
-                        <i class="fas fa-camera"></i> <span class="hidden-md hidden-sm hidden-xs"><?php echo __("Go Live With Webcam"); ?></span><span class="hidden-lg"><?php echo __("Webcam"); ?></span>
                     </button>
                     <?php
                 }
@@ -202,7 +199,7 @@ include $global['systemRootPath'] . 'view/bootstrap/fileinput.php';
                 $poster = Live::getRegularPosterImage(User::getId(), $_REQUEST['live_servers_id'], 0, 0);
 
                 $liveStreamObject = new LiveStreamObject($trasnmition['key'], $trasnmition['live_servers_id']);
-                Live::getLiveControls($liveStreamObject->getKeyWithIndex(true,true), $trasnmition['live_servers_id']);   
+                Live::getLiveControls($liveStreamObject->getKeyWithIndex(true, true), $trasnmition['live_servers_id']);
                 ?>
             </ul>
         </div>
@@ -237,15 +234,42 @@ include $global['systemRootPath'] . 'view/bootstrap/fileinput.php';
     };
     var params = {};
     var attributes = {};
+    var isSavingStream = false;
 
-    function saveStream() {
-        modal.showPleaseWait();
+    async function saveStream(_this = null) {
+        if (isSavingStream) {
+            return false;
+        }
+        isSavingStream = true;
 
         var selectedUserGroups = [];
         $('.userGroups:checked').each(function() {
             selectedUserGroups.push($(this).val());
         });
 
+        if ($(_this).attr('id') == 'recordLive') {
+            if ($(_this).is(":checked")) {
+                $('#isRebroadcast').prop('checked', false);
+            }
+        } else if ($(_this).attr('id') == 'isRebroadcast') {
+            if ($(_this).is(":checked")) {
+                $('#recordLive').prop('checked', false);
+            }
+        }
+
+        if (selectedUserGroups.length > 0) {
+            let confirmResponse = await avideoConfirmUserGroups();
+            if (confirmResponse === 'cancel') {
+                modal.hidePleaseWait();
+                isSavingStream = false;
+                return;
+            } else if (confirmResponse === 'remove') {
+                selectedUserGroups = []; // Remove user groups to make it public
+                $('.userGroups').prop('checked', false); // Uncheck all user groups
+            }
+        }
+
+        modal.showPleaseWait();
         $.ajax({
             url: webSiteRootURL + 'plugin/Live/saveLive.php',
             data: {
@@ -255,6 +279,7 @@ include $global['systemRootPath'] . 'view/bootstrap/fileinput.php';
                 "key": "<?php echo $trasnmition['key']; ?>",
                 "listed": $('#listed').is(":checked"),
                 "saveTransmition": $('#recordLive').is(":checked"),
+                "isRebroadcast": $('#isRebroadcast').is(":checked"),
                 "userGroups": selectedUserGroups,
                 users_id: '<?php echo $users_id; ?>',
                 password: $('#password_livestream').val()
@@ -263,9 +288,43 @@ include $global['systemRootPath'] . 'view/bootstrap/fileinput.php';
             complete: function(resp) {
                 avideoResponse(resp);
                 modal.hidePleaseWait();
+                isSavingStream = false;
             }
         });
     }
+
+    async function avideoConfirmUserGroups() {
+        var span = document.createElement("span");
+        span.innerHTML = __("This live will be private and restricted to selected user groups. Do you want to proceed?", true);
+
+        return await swal({
+            title: __('Confirm Privacy'),
+            content: span,
+            icon: 'warning',
+            closeOnClickOutside: false,
+            closeModal: true,
+            buttons: {
+                cancel: {
+                    text: __("Cancel"),
+                    value: "cancel",
+                    visible: true, // Ensure the cancel button is shown
+                    className: "btn-danger",
+                },
+                confirm: {
+                    text: __("OK, Save as Private"),
+                    value: "confirm",
+                    className: "btn-success",
+                },
+                remove: {
+                    text: __("Remove User Groups and Save as Public"),
+                    value: "remove",
+                    className: "btn-warning",
+                }
+            }
+        });
+    }
+
+
     $(document).ready(function() {
         $('#removePoster').click(function() {
             modal.showPleaseWait();

@@ -175,7 +175,7 @@ class Message implements MessageComponentInterface
         dbDeleteConnection($conn->resourceId);
         //_log_message("onClose {$conn->resourceId} has deleted");
         $this->unsetClient($conn, $client);
-        if ($this->shouldPropagateInfo($client) && !$this->isDeviceCommandLine($client['yptDeviceId'])) {
+        if ($this->shouldPropagateInfo($client) && !empty($client['yptDeviceId']) && !$this->isDeviceCommandLine($client['yptDeviceId'])) {
             $this->msgToAll(array('users_id' => $client['users_id'], 'disconnected' => $conn->resourceId), \SocketMessageType::NEW_DISCONNECTION);
         }
         //_log_message("Connection {$conn->resourceId} has disconnected");
@@ -357,7 +357,7 @@ class Message implements MessageComponentInterface
             return false;
         }
 
-        _log_message("msgToResourceId: go ".json_encode($msg));
+        //_log_message("msgToResourceId: go ".json_encode($msg));
         if (!is_array($msg)) {
             $this->msgToArray($msg);
         }

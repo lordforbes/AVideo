@@ -101,7 +101,7 @@ $tToleranceSide = 0.2;
                     <hr>
                 </li>
                 <li>
-                    <div>
+                    <div class="clearfix">
                         <?php
                         include $global['systemRootPath'] . 'view/include/forKids.php';
                         ?>
@@ -181,7 +181,24 @@ $tToleranceSide = 0.2;
                                 </a>
                             </div>
                         </li>
-                    <?php }
+                        <?php
+                    } else {
+                        global $canUploadMessage;
+                        if (!empty($canUploadMessage)) {
+                        ?>
+                            <li>
+                                <div>
+                                    <a href="#" class="btn btn-default btn-block disabled" style="border-radius: 0;">
+                                        <i class="fa-solid fa-ban"></i>
+                                        <span class="menuLabel">
+                                            <?php echo __($canUploadMessage); ?>
+                                        </span>
+                                    </a>
+                                </div>
+                            </li>
+                    <?php
+                        }
+                    }
                     ?>
                     <li>
 
@@ -416,7 +433,7 @@ $tToleranceSide = 0.2;
                     $menus[] = '?>
                                 <li>
                                     <a href="#" class="clearCacheButton">
-                                        <i class="fa fa-trash"></i> 
+                                        <i class="fa fa-trash"></i>
                                         <span class="menuLabel">
                                         <?php echo __("Clear Cache Directory"); ?>
                                         </span>
@@ -429,7 +446,7 @@ $tToleranceSide = 0.2;
                     $menus[] = ' ?>
                                 <li>
                                     <a  href="#" onclick="avideoModalIframeFull(webSiteRootURL+\'i/log\');return false;" class="">
-                                        <i class="fas fa-clipboard-list"></i> 
+                                        <i class="fas fa-clipboard-list"></i>
                                         <span class="menuLabel">
                                         <?php echo __("Log file"); ?>
                                         </span>
@@ -442,7 +459,7 @@ $tToleranceSide = 0.2;
                     $menus[] = '?>
                                 <li>
                                     <a href="#" class="generateSiteMapButton">
-                                        <i class="fa fa-sitemap"></i> 
+                                        <i class="fa fa-sitemap"></i>
                                         <span class="menuLabel">
                                         <?php echo __("Generate Sitemap"); ?>
                                         </span>
@@ -567,7 +584,7 @@ $tToleranceSide = 0.2;
                     TimeLogEnd($tnameSide, __LINE__, $tToleranceSide);
                     $categories = Category::getAllCategories(false, true, false, $sameUserGroupAsMe);
                     TimeLogEnd($tnameSide, __LINE__, $tToleranceSide);
-                    echo "<!-- categories found ".count($categories)." -->";
+                    echo "<!-- categories found " . count($categories) . " -->";
                     foreach ($categories as $value) {
                         if ($value['parentId']) {
                             echo "<!-- categories parentId is present {$value['parentId']} -->";
@@ -589,7 +606,7 @@ $tToleranceSide = 0.2;
                         //$parsed_cats[] = $value['id'];
                         echo '<li class="navsub-toggle ' . ($value['clean_name'] == @$_REQUEST['catName'] ? "active" : "") . '">'
                             . '<a href="' . Category::getCategoryLinkFromName($value['clean_name']) . '" >';
-                        echo '<span class="' . (empty($value['iconClass']) ? "fa fa-folder" : $value['iconClass']) . '"></span>  
+                        echo '<span class="' . (empty($value['iconClass']) ? "fa fa-folder" : $value['iconClass']) . '"></span>
                         <span class="menuLabel">' . __($value['name']) . '</span>';
                         if (empty($advancedCustom->hideCategoryVideosCount)) {
                             echo ' <span class="badge hideIfCompressed">' . $total . '</span>';
@@ -601,7 +618,7 @@ $tToleranceSide = 0.2;
                     TimeLogEnd($tnameSide, __LINE__, $tToleranceSide);
                     $_POST = $post;
                     $_GET = $get;
-                }else{
+                } else {
                     echo "<!-- categories doNotDisplayCategoryLeftMenu -->";
                 }
 

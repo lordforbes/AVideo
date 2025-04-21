@@ -17,6 +17,7 @@ class LiveTransmition extends ObjectYPT {
     protected $description;
     protected $showOnTV;
     protected $password;
+    protected $isRebroadcast;
 
     public static function getSearchFieldsNames() {
         return ['title'];
@@ -51,7 +52,7 @@ class LiveTransmition extends ObjectYPT {
     }
 
     /**
-     * 
+     *
      * @return string
      */
     public function getKey() {
@@ -231,7 +232,7 @@ class LiveTransmition extends ObjectYPT {
 
     public static function getFromDbByUserName($userName) {
         global $global;
-        _mysql_connect();
+        //_mysql_connect();
         $sql = "SELECT * FROM users WHERE user = ? LIMIT 1";
         $res = sqlDAL::readSql($sql, "s", [$userName]);
         $data = sqlDAL::fetchAssoc($res);
@@ -251,7 +252,7 @@ class LiveTransmition extends ObjectYPT {
 
     public static function getFromDbByChannelName($channelName, $allowOnlineIndex = false) {
         global $global;
-        _mysql_connect();
+        //_mysql_connect();
         $sql = "SELECT * FROM users WHERE channelName = ? LIMIT 1";
         $res = sqlDAL::readSql($sql, "s", [$channelName]);
         $data = sqlDAL::fetchAssoc($res);
@@ -287,7 +288,7 @@ class LiveTransmition extends ObjectYPT {
     }
 
     public static function keyExists($key, $checkSchedule = true) {
-        global $global;
+        global $global, $_keyExistsSQL;
         if (!is_string($key)) {
             return false;
         }
@@ -297,7 +298,8 @@ class LiveTransmition extends ObjectYPT {
         $key = Live::cleanUpKey($key);
         $sql = "SELECT u.*, lt.*, lt.password as live_password FROM " . static::getTableName() . " lt "
                 . " LEFT JOIN users u ON u.id = users_id AND u.status='a' "
-                . " WHERE  `key` = '$key' LIMIT 1";
+                . " WHERE  `key` = '$key' ORDER BY lt.modified DESC, lt.id DESC LIMIT 1";
+        $_keyExistsSQL = $sql;
         $res = sqlDAL::readSql($sql);
         $data = sqlDAL::fetchAssoc($res);
         sqlDAL::close($res);
@@ -347,9 +349,20 @@ class LiveTransmition extends ObjectYPT {
     }
 
     public function save() {
+        global $_keyExistsSQL;
         if (empty($this->users_id)) {
             return false;
         }
+
+        $lt = LiveTransmition::getFromKey($this->key);
+        if(!empty($lt)){
+            if($lt['users_id'] != $this->users_id){
+                $oldLt = LiveTransmition::getFromDbByUser($this->users_id);
+                _error_log("LiveTransmition::save ERROR the key [{$this->key}] already associated to users_id=[{$lt['users_id']}] and you are user [{$this->users_id}], reverting the key to [{$oldLt['key']}] $_keyExistsSQL");
+                $this->key = $oldLt['key'];
+            }
+        }
+
         $row = self::getFromDbByUser($this->users_id, true);
         if (!empty($row)) {
             $this->id = $row['id'];
@@ -361,7 +374,7 @@ class LiveTransmition extends ObjectYPT {
         if (empty($this->password)) {
             $this->password = '';
         }
-        _error_log("LiveTransmition::save users_id=".User::getId().' IP='.getRealIpAddr().' '.json_encode(debug_backtrace()));
+        _error_log("LiveTransmition::save key=[{$this->key}] users_id={$this->users_id} logged_users_id=".User::getId().' IP='.getRealIpAddr().' '.json_encode(debug_backtrace()));
         $id = parent::save();
         //Category::clearCacheCount();
         deleteStatsNotifications(true);
@@ -416,6 +429,10 @@ class LiveTransmition extends ObjectYPT {
             return true;
         }
 
+        $objLive = AVideoPlugin::getDataObject("Live");
+        if($objLive->hideUserGroups){
+            return true;
+        }
         $transmitionGroups = $this->getGroups();
         if (!empty($transmitionGroups)) {
             _error_log('LiveTransmition::userCanSeeTransmition usergroup not empty '.json_encode($transmitionGroups));
@@ -473,6 +490,14 @@ class LiveTransmition extends ObjectYPT {
 
     public function setPassword($password): void {
         $this->password = trim($password);
+    }
+
+    public function getIsRebroadcast() {
+        return !empty($this->isRebroadcast);
+    }
+
+    public function setIsRebroadcast($isRebroadcast): void {
+        $this->isRebroadcast = !_empty($isRebroadcast)?1:0;
     }
 
     public static function canSaveTransmition($users_id) {

@@ -3,14 +3,15 @@
 #bigVideo,
 .mainArea,
 .galleryVideo,
-#sidebar,
+#sideBarContainer > ul > li > div,
 .navbar-header li,
 .panel-heading,
 th,
 td,
 a,
 .panel-footer,
-.label {
+.label,
+.videoPlaylist .material-switch label{
     direction: rtl;
     unicode-bidi: embed;
 }
@@ -21,7 +22,10 @@ a,
 
 .dropdown-menu,
 .navbar-header li a,
-#sideBarContainer .btn {
+#sideBarContainer .btn,
+#sideBarContainer a,
+#sideBarContainer > ul,
+.videoPlaylist {
     text-align: right !important;
 }
 
@@ -46,6 +50,6 @@ a,
     float: left !important;
 }
 
-.material-switch {
-    direction: initial;
+.material-switch label{
+    margin-left: 5px;
 }

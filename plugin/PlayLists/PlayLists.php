@@ -334,7 +334,7 @@ class PlayLists extends PluginAbstract
             if (empty($obj->useOldPlayList)) {
                 //$url = $global['webSiteRootURL'] . "plugin/PlayLists/player.php?playlists_id=" . $playlists_id;
                 $url = $global['webSiteRootURL'] . "play/" . $playlists_id;
-            } else {                
+            } else {
                 $url = PlayLists::getURL($playlists_id);
             }
         }
@@ -880,6 +880,10 @@ class PlayLists extends PluginAbstract
 
     static function scheduleLiveButton($playlists_id, $showLabel = true, $class = 'btn btn-xs btn-default')
     {
+        if (!self::showPlayLiveButton()) {
+            _error_log("Playlists:scheduleLiveButton: showPlayLiveButton said no");
+            return '<!-- Playlists:scheduleLiveButton: showPlayLiveButton said no -->';
+        }
         // can the user live?
         if (!User::canStream()) {
             _error_log("Playlists:scheduleLiveButton this user cannot stream");
@@ -905,7 +909,13 @@ class PlayLists extends PluginAbstract
             $labelText = '';
         }
 
-        return "<button class=\"{$class}\" onclick=\"avideoModalIframe('$liveLink');\" data-toggle=\"tooltip\" title=\"$label\" ><i class=\"fas fa-broadcast-tower\"></i> $labelText</button>";
+        $btn = "<button class=\"{$class}\" onclick=\"avideoModalIframe('$liveLink');\" data-toggle=\"tooltip\" title=\"$label\" ><i class=\"fas fa-broadcast-tower\"></i> $labelText</button>";
+        if(AVideoPlugin::isEnabledByName('VideoPlaylistScheduler')){
+            $liveLink = "{$global['webSiteRootURL']}plugin/VideoPlaylistScheduler/playLiveInLoop.php";
+            $liveLink = addQueryStringParameter($liveLink, 'playlists_id', $playlists_id);
+            $btn .= "<button class=\"{$class}\" onclick=\"avideoModalIframe('{$liveLink}');\" data-toggle=\"tooltip\" title=\"$label Loop\" ><i class=\"fa-solid fa-infinity\"></i> $labelText</button>";
+        }
+        return $btn;
     }
 
     static function getVideosIdFromPlaylist($playlists_id)
@@ -1146,7 +1156,7 @@ class PlayLists extends PluginAbstract
             }
         }
         $plURL = "{$global['webSiteRootURL']}program/{$playlist_id}/{$count}/" . urlencode(cleanURLName($PLChannelName)) . '/' . urlencode(cleanURLName($plName)) . '/' . urlencode(cleanURLName($current_video_clean_title));
-        
+
         return $plURL;
         */
     }
@@ -1243,7 +1253,7 @@ class PlayListPlayer
                 return $playListObj->getName();
             }
         } else if (!empty($this->tags_id)) {
-            //require_once $global['systemRootPath'] . 'plugin/VideoTags/Objects/Tags.php';            
+            //require_once $global['systemRootPath'] . 'plugin/VideoTags/Objects/Tags.php';
             AVideoPlugin::getObjectData("VideoTags");
             $tag = new Tags($this->tags_id);
             return $tag->getName();
@@ -1276,7 +1286,7 @@ class PlayListPlayer
               array_unshift($videos, $videoSerie);
               }
               }
-             * 
+             *
              */
         } else if (!empty($this->tags_id)) {
             global $_plt_getVideos;

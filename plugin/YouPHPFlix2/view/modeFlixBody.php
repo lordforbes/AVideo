@@ -8,7 +8,7 @@ background: -o-linear-gradient(top, rgba({$obj->backgroundRGB},1) {$percent}%, r
 background: linear-gradient(top, rgba({$obj->backgroundRGB},1) {$percent}%, rgba({$obj->backgroundRGB},0) 100%);
 background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent}%, rgba({$obj->backgroundRGB},0) 100%);
 ";
-
+$videoFound = false;
 ?>
 <div id="carouselRows" style="<?php echo $styleBG; ?>">
     <?php
@@ -35,6 +35,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
                     $rowCount = getRowCount();
                     $videos = PlayList::getAllFromPlaylistsID($playlists_id);
                     if (!empty($videos)) {
+                        $videoFound = true;
                         $link = PlayLists::getLink($playlists_id);
                         $linkEmbed = PlayLists::getLink($playlists_id, true);
                         ?>
@@ -59,6 +60,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
                     $rowCount = getRowCount();
                     $videos = PlayList::getAllFromPlaylistsID($playlists_id);
                     if (!empty($videos)) {
+                        $videoFound = true;
                         $link = PlayLists::getLink($playlists_id);
                         $linkEmbed = PlayLists::getLink($playlists_id, true);
                         ?>
@@ -97,6 +99,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
         //getAllVideos($status = Video::SORT_TYPE_VIEWABLE, $showOnlyLoggedUserVideos = false, $ignoreGroup = false, $videosArrayId = array(), $getStatistcs = false, $showUnlisted = false, $activeUsersOnly = true, $suggestedOnly = false)
         $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLENOTUNLISTED, false, !$obj->hidePrivateVideos, array(), false, false, true, true);
         if (!empty($videos)) {
+            $videoFound = true;
             ?>
             <!-- modeFlixBody line=<?php echo __LINE__; ?> -->
             <div class="row topicRow">
@@ -152,6 +155,9 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
             }
             $_POST['sort']['created'] = "DESC";
             $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLE, $channel['id']);
+            if(!empty($videos)){
+                $videoFound = true;
+            }
             unset($_POST['sort']['created']);
             if (empty($videos)) {
                 continue;
@@ -198,6 +204,9 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
                 $rowCount = getRowCount();
                 foreach ($plRows as $pl) {
                     $videos = PlayList::getAllFromPlaylistsID($pl['id']);
+                    if(!empty($videos)){
+                        $videoFound = true;
+                    }
                     if (empty($videos)) {
                         continue;
                     }
@@ -242,6 +251,9 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
                     foreach ($programs as $serie) {
                         $videos = PlayList::getAllFromPlaylistsID($serie['serie_playlists_id']);
 
+                        if(!empty($videos)){
+                            $videoFound = true;
+                        }
                         foreach ($videos as $key => $value) {
                             $videos[$key]['title'] = "{$value['icon']} {$value['title']}";
                         }
@@ -306,6 +318,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
         $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLENOTUNLISTED, false, !$obj->hidePrivateVideos);
         unset($_POST['sort']['trending']);
         if (!empty($videos)) {
+            $videoFound = true;
             ?>
             <!-- modeFlixBody line=<?php echo __LINE__; ?> -->
             <div class="row topicRow">
@@ -340,6 +353,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
 
         $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLENOTUNLISTED, false, !$obj->hidePrivateVideos);
         if (!empty($videos)) {
+            $videoFound = true;
         ?>
             <!-- modeFlixBody line=<?php echo __LINE__; ?> -->
             <div class="row topicRow">
@@ -376,6 +390,9 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
         $_POST['sort']['likes'] = "DESC";
         $_POST['sort']['v.created'] = "DESC";
         $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLENOTUNLISTED, false, !$obj->hidePrivateVideos);
+        if(!empty($videos)){
+            $videoFound = true;
+        }
         ?>
         <!-- modeFlixBody line=<?php echo __LINE__; ?> -->
         <div class="row topicRow">
@@ -411,6 +428,9 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
         $_POST['sort']['views_count'] = "DESC";
         $_POST['sort']['created'] = "DESC";
         $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLENOTUNLISTED, false, !$obj->hidePrivateVideos);
+        if(!empty($videos)){
+            $videoFound = true;
+        }
     ?>
         <span class="md-col-12">&nbsp;</span>
         <!-- modeFlixBody line=<?php echo __LINE__; ?> -->
@@ -444,6 +464,9 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
         $_POST['sort']['title'] = "ASC";
         $_POST['sort']['created'] = "DESC";
         $videos = Video::getAllVideos(Video::SORT_TYPE_VIEWABLENOTUNLISTED, false, !$obj->hidePrivateVideos);
+        if(!empty($videos)){
+            $videoFound = true;
+        }
     ?>
         <span class="md-col-12">&nbsp;</span>
         <!-- modeFlixBody line=<?php echo __LINE__; ?> -->
@@ -459,6 +482,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
     <?php
     }
     if ($obj->Categories) {
+        $videoFound = true; // it will be decided inside the infinity scroll
         $url = "{$global['webSiteRootURL']}plugin/YouPHPFlix2/view/modeFlixCategory.php";
         if (!empty($_REQUEST['catName'])) {
             $url = addQueryStringParameter($url, 'catName', $_REQUEST['catName']);
@@ -482,7 +506,7 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
                 <i class="fas fa-spinner fa-pulse text-muted"></i>
             </div>
         </div>
-        <script src="<?php echo getCDN(); ?>node_modules/infinite-scroll/dist/infinite-scroll.pkgd.min.js" type="text/javascript"></script>
+        <script src="<?php echo getURL('node_modules/infinite-scroll/dist/infinite-scroll.pkgd.min.js'); ?>" type="text/javascript"></script>
         <script>
             $(document).ready(function() {
                 $container = $('#categoriesContainer').infiniteScroll({
@@ -527,3 +551,8 @@ background: -moz-linear-gradient(to top, rgba({$obj->backgroundRGB},1) {$percent
     resetCurrentPage();
     ?>
 </div>
+<?php
+if(!$videoFound){
+    include_once __DIR__.'/notFoundHTML.php';
+}
+?>

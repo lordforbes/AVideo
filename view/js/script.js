@@ -86,11 +86,16 @@ if (window.navigator.standalone || window.matchMedia('(display-mode: standalone)
     document.body.classList.add('pwa');
 }
 
+
 var queryString = window.location.search;
 var urlParams = new URLSearchParams(queryString);
 
 if (urlParams.has('debug')) {
     isDebuging = false;
+}
+
+function getSearchParam(param) {
+    return urlParams.get(param) || "";
 }
 
 function forwardToIframe(data) {
@@ -296,6 +301,7 @@ async function lazyImage() {
 }
 
 var pauseIfIsPlayinAdsInterval;
+
 async function setPlayerListners() {
     if (typeof player !== 'undefined') {
         player.on('pause', function () {
@@ -307,12 +313,13 @@ async function setPlayerListners() {
         player.on('play', function () {
             isTryingToPlay = false;
             cancelAllPlaybackTimeouts();
+            /* this was messing um the start playback time
             if (startCurrentTime) {
                 setTimeout(function () {
                     setCurrentTime(startCurrentTime);
                     startCurrentTime = 0;
                 }, 100);
-            }
+            }*/
             //console.log("setPlayerListners: play");
             //userIsControling = true;
             pauseIfIsPlayinAdsInterval = setInterval(function () {
@@ -868,9 +875,6 @@ function playVideoSegment(startTime, endTime) {
 
 function playerPlayIfAutoPlay(currentTime) {
     console.log("playerPlayIfAutoPlay: forceCurrentTime:", currentTime);
-    if (isWebRTC()) {
-        return false;
-    }
     if (forceCurrentTime !== null) {
         currentTime = forceCurrentTime;
         forceCurrentTime = null;
@@ -902,9 +906,6 @@ function cancelAllPlaybackTimeouts() {
 }
 
 function playerPlayMutedIfAutoPlay(currentTime) {
-    if (isWebRTC()) {
-        return false;
-    }
     if (forceCurrentTime !== null) {
         currentTime = forceCurrentTime;
         forceCurrentTime = null;
@@ -1093,7 +1094,7 @@ var initdone = false;
 var startCurrentTime = 0;
 var forceCurrentTime = null;
 function setCurrentTime(currentTime) {
-    if(typeof isLive !== 'undefined' && isLive){
+    if (typeof isLive !== 'undefined' && isLive) {
         console.log("setCurrentTime: isLive", currentTime, isLive);
         return false;
     }
@@ -1115,10 +1116,11 @@ function setCurrentTime(currentTime) {
                 return false; // if is trying to play, only update if the time is greater
             }
         }
+        console.trace();
         console.log("setCurrentTime 1: ", currentTime);
         player.currentTime(currentTime);
         initdone = false;
-        // wait for video metadata to load, then set time 
+        // wait for video metadata to load, then set time
         player.on("loadedmetadata", function () {
             //console.log('setCurrentTime loadedmetadata', currentTime);
             //player.currentTime(currentTime);
@@ -1127,6 +1129,7 @@ function setCurrentTime(currentTime) {
         // events: https://www.w3.org/TR/html5/embedded-content-0.html#mediaevents
         player.on("canplaythrough", function () {
             if (!initdone) {
+                console.trace();
                 console.log('setCurrentTime canplaythrough', currentTime);
                 player.currentTime(currentTime);
                 initdone = true;
@@ -1146,22 +1149,12 @@ function isALiveContent() {
     return false;
 }
 
-function isWebRTC() {
-    if (typeof _isWebRTC !== 'undefined') {
-        return _isWebRTC;
-    }
-    return false;
-}
-
 function isAutoplayEnabled() {
     //consoleLog("Cookies.get('autoplay')", Cookies.get('autoplay'));
     if (typeof forceNotautoplay !== 'undefined' && forceNotautoplay) {
         return false;
     } else if (typeof forceautoplay !== 'undefined' && forceautoplay) {
         return true;
-    } else if (isWebRTC()) {
-        consoleLog("isAutoplayEnabled said No because is WebRTC ");
-        return false;
     } else if (isALiveContent()) {
         consoleLog("isAutoplayEnabled always autoplay live contents");
         return true;
@@ -1314,7 +1307,7 @@ async function avideoConfirm(msg) {
     var span = document.createElement("span");
     span.innerHTML = __(msg, true);
     var response = await swal({
-        title: 'Confrim',
+        title: 'Confirm',
         content: span,
         icon: 'warning',
         closeOnClickOutside: false,
@@ -1345,19 +1338,21 @@ function avideoAlertOnceForceConfirm(title, msg, type) {
     });
 }
 
-function _avideoToast(msg, icon) {
+function _avideoToast(msg, icon, displayTime = 0) {
     if (empty(msg)) {
         msg = '';
     }
     try {
-        // Average reading speed: around 200 words per minute (or 3.3 words per second)
-        var wordsPerSecond = 2;
-        var words = msg.split(' ').length;
-        var readingTimeInSeconds = words / wordsPerSecond;
+        if (displayTime == 0) {
+            // Average reading speed: around 200 words per minute (or 3.3 words per second)
+            var wordsPerSecond = 2;
+            var words = msg.split(' ').length;
+            var readingTimeInSeconds = words / wordsPerSecond;
 
-        // Convert reading time to milliseconds and add a buffer time
-        var displayTime = Math.max(readingTimeInSeconds * 1000 + 2000, 7000); // Minimum display time of 7000ms
+            // Convert reading time to milliseconds and add a buffer time
+            displayTime = Math.max(readingTimeInSeconds * 1000 + 2000, 7000); // Minimum display time of 7000ms
 
+        }
         var options = { text: msg, hideAfter: displayTime };
         if (icon) {
             options.icon = icon;
@@ -1368,20 +1363,20 @@ function _avideoToast(msg, icon) {
     }
 }
 
-function avideoToast(msg) {
-    _avideoToast(msg, null);
+function avideoToast(msg, displayTime = 0) {
+    _avideoToast(msg, null, displayTime);
 }
-function avideoToastInfo(msg) {
-    _avideoToast(msg, 'info');
+function avideoToastInfo(msg, displayTime = 0) {
+    _avideoToast(msg, 'info', displayTime);
 }
-function avideoToastError(msg) {
-    _avideoToast(msg, 'error');
+function avideoToastError(msg, displayTime = 0) {
+    _avideoToast(msg, 'error', displayTime);
 }
-function avideoToastSuccess(msg) {
-    _avideoToast(msg, 'success');
+function avideoToastSuccess(msg, displayTime = 0) {
+    _avideoToast(msg, 'success', displayTime);
 }
-function avideoToastWarning(msg) {
-    _avideoToast(msg, 'warning');
+function avideoToastWarning(msg, displayTime = 0) {
+    _avideoToast(msg, 'warning', displayTime);
 }
 
 function avideoAlertAJAXHTML(url) {
@@ -1390,6 +1385,22 @@ function avideoAlertAJAXHTML(url) {
         url: url,
         complete: function (response) {
             avideoAlertText(response);
+            modal.hidePleaseWait();
+        }
+    });
+}
+
+function avideoAlertAJAXJson(url) {
+    modal.showPleaseWait();
+    $.ajax({
+        url: url,
+        complete: function (jqXHR) {
+            response = (jqXHR.responseJSON);
+            if (typeof response == 'object' && typeof response.msg !== 'undefined') {
+                avideoAlertText(response.msg);
+            } else {
+                avideoAlertText(response);
+            }
             modal.hidePleaseWait();
         }
     });
@@ -1782,11 +1793,15 @@ function json_decode(jsonString) {
 }
 
 function avideoResponse(response) {
-    //console.log('avideoResponse', response);
+    //console.log('avideoResponse 1', response);
     if (typeof response === 'string') {
         response = json_decode(response);
     }
-    //console.log('avideoResponse', response);
+
+    if (typeof response.responseJSON === 'object') {
+        response = response.responseJSON;
+    }
+    //console.log('avideoResponse 2', response);
     if (response.error) {
         if (!response.msg) {
             if (typeof response.error === 'string') {
@@ -1949,7 +1964,7 @@ async function checkDescriptionArea() {
 
 var clearCacheExecuted = false;
 function clearCache(showPleaseWait, FirstPage, sessionOnly) {
-    if(clearCacheExecuted){
+    if (clearCacheExecuted) {
         return false;
     }
     clearCacheExecuted = true;
@@ -1964,7 +1979,7 @@ function clearCache(showPleaseWait, FirstPage, sessionOnly) {
                 avideoResponse(response);
                 modal.hidePleaseWait();
                 setTimeout(() => {
-                    clearCacheExecuted = false; 
+                    clearCacheExecuted = false;
                 }, 1000);
             }
         }
@@ -2739,13 +2754,25 @@ function getCursorPos(input) {
 
 function isUserOnline(users_id) {
     users_id = parseInt(users_id);
-    if (typeof users_id_online === 'undefined' || empty(users_id_online) || !Array.isArray(users_id_online)) {
+
+    if (typeof users_id_online === 'undefined' || !users_id_online) {
         console.log('isUserOnline', users_id);
         return false;
     }
 
-    return users_id_online.find((u) => u.users_id == users_id);
+    // Verifica se é array
+    if (Array.isArray(users_id_online)) {
+        return users_id_online.find((u) => u.users_id == users_id);
+    }
+
+    // Verifica se é objeto e tem a chave correspondente
+    if (typeof users_id_online === 'object' && users_id_online.hasOwnProperty(users_id)) {
+        return users_id_online[users_id];
+    }
+
+    return false;
 }
+
 
 function isReadyToCheckIfIsOnline() {
     return typeof users_id_online !== 'undefined' && !empty(users_id_online);
@@ -3264,7 +3291,7 @@ async function videoJSRecreateSources(defaultSource) {
 }
 
 /**
- * 
+ *
  * MEDIA_ERR_ABORTED (numeric value 1)
  MEDIA_ERR_NETWORK (numeric value 2)
  MEDIA_ERR_DECODE (numeric value 3)
@@ -3742,7 +3769,7 @@ function arrayToTemplate(itemsArray, template) {
  document.location = url;
  }
  }
- 
+
  function avideoLoadPage3(url) {
  console.log('avideoLoadPage3', url);
  avideoPushState(url);
@@ -3779,7 +3806,7 @@ function arrayToTemplate(itemsArray, template) {
  }
  });
  }
- 
+
  function avideoLoadPage2(url) {
  console.log('avideoLoadPage', url);
  avideoPushState(url);
@@ -3789,7 +3816,7 @@ function arrayToTemplate(itemsArray, template) {
  success: function (data) {
  var parser = new DOMParser();
  var htmlDoc = parser.parseFromString(data, "text/html");
- 
+
  $('body').fadeOut('fast', function () {
  var bodyElement = $(htmlDoc).find('body');
  var head = $(htmlDoc).find('head').html();
@@ -3809,8 +3836,8 @@ function arrayToTemplate(itemsArray, template) {
  }
  });
  }
- 
- 
+
+
  async function aHrefToAjax() {
  if(typeof useIframe === 'undefined' || !useIframe){
  return false;
@@ -3829,7 +3856,7 @@ function arrayToTemplate(itemsArray, template) {
  }
  });
  }
- 
+
  function addScripts(scriptsToAdd) {
  var localScripts = $("script");
  for (index in scriptsToAdd) {
@@ -3841,13 +3868,13 @@ function arrayToTemplate(itemsArray, template) {
  try {
  $('body').append(script);
  } catch (e) {
- 
+
  }
  } else {
  var scriptFound = false;
  localScripts.each(function () {
  var _src = $(this).attr('src');
- 
+
  if (src === _src) {
  scriptFound = true;
  return false;
@@ -3938,10 +3965,10 @@ function getUniqueValuesFromArray(items) {
     return [...new Set(items)];
 }
 
-//autoPlayTime 
+//autoPlayTime
 // if === false it will not play
 // if === -1 it will play as the api response (last position)
-// if is any positive int or 0 it will play at that position 
+// if is any positive int or 0 it will play at that position
 function updateVideoPlayer(videos_id, autoPlayTime) {
     modal.showPleaseWait();
     $.ajax({
@@ -4072,15 +4099,15 @@ function addCloseButtonInPage() {
     }
 }
 
-function closeFullScreenOrHistoryBack(){
+function closeFullScreenOrHistoryBack() {
     if (window.self !== window.top) {
         console.log('closeFullScreenOrHistoryBack execute in parent');
         window.parent.postMessage('closeFullscreen', '*');
     } else {
-        if(urlParams.has('originURL64')){
+        if (urlParams.has('originURL64')) {
             var url64 = urlParams.get('originURL64');
             var url = atob(url64);
-            if(isValidURL(url)){
+            if (isValidURL(url)) {
                 console.log('closeFullScreenOrHistoryBack document.location ', url);
                 document.location = url;
                 return true;
@@ -4338,13 +4365,21 @@ function setTinyMCEVal(id, val) {
 }
 
 var _displayJsonAsHtmlCount = 0;
-function displayJsonAsHtml(jsonObjectOrString) {
+function displayJsonAsHtml(jsonObjectOrString, level = 0) {
+    if (level > 3) {
+        return '';
+    }
     // Check if the input is a string and parse it into an object if so
     var jsonObject = (typeof jsonObjectOrString === "string") ? JSON.parse(jsonObjectOrString) : jsonObjectOrString;
 
     var html = '';
-
+    var countLoop = 0;
     $.each(jsonObject, function (key, value) {
+
+        countLoop++;
+        if (countLoop > 10) {
+            return html;
+        }
         var rowHtml = '<div class="displayJsonAsHtml">';
 
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
@@ -4357,7 +4392,7 @@ function displayJsonAsHtml(jsonObjectOrString) {
                 '</h4>' +
                 '</div>' +
                 '<div id="' + collapseId + '" class="panel-collapse collapse">' +
-                '<div class="panel-body">' + displayJsonAsHtml(value) + '</div>' +
+                '<div class="panel-body">' + displayJsonAsHtml(value, level + 1) + '</div>' +
                 '</div>' +
                 '</div>';
             rowHtml += panelHtml;
@@ -4516,12 +4551,16 @@ function getTotalPageLoadSeconds() {
     return TotalPageLoadSeconds;
 }
 
-function getVideosId(){
-    if(typeof videos_id != 'undefined'){
+function getVideosId() {
+    if (typeof videos_id != 'undefined') {
         return videos_id;
     }
-    if(typeof mediaId != 'undefined'){
+    if (typeof mediaId != 'undefined') {
         return mediaId;
     }
     return 0;
+}
+
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
 }

@@ -29,6 +29,8 @@ if (AVideoPlugin::isEnabledByName('Rebroadcaster')) {
         $key = $rb['cleankey'];
     }
 }
+
+$keyForStreamSettingTab = $key;
 //var_dump(getLiveKey(), $islive, $key, User::getId());exit;
 ?>
 <style>
@@ -37,64 +39,14 @@ if (AVideoPlugin::isEnabledByName('Rebroadcaster')) {
         border-bottom-left-radius: 0;
     }
 </style>
-<div class="panel panel-default <?php echo getCSSAnimationClassAndStyle('animate__fadeInLeft', 'live'); ?>" id="RTMPSettings">
-    <div class="panel-heading">
-        <i class="fas fa-hdd"></i> <?php echo __("RTMP Settings"); ?> (<?php echo $channelName; ?>)
-        <div class="pull-right">
-            <?php
-            echo getTourHelpButton('plugin/Live/tabs/help.json', 'btn btn-default btn-xs', 'Live Configuration Help');
-            ?>
-        </div>
-    </div>
-    <div class="panel-body" style="overflow: hidden;" >        
 
-        <div class="form-group" id="ServerURL">
-            <label for="server"><i class="fa fa-server"></i> <?php echo __("Server URL"); ?>:</label>
-            <?php
-            getInputCopyToClipboard('server', Live::getRTMPLinkWithOutKey(User::getId()));
-            ?>
-            <!--
-            <small class="label label-info"><i class="fa fa-warning"></i> <?php echo __("If you change your password the Server URL parameters will be changed too."); ?></small>
-            -->
-        </div>
-        <div class="form-group" id="ServerName">
-            <label for="streamkey"><i class="fa fa-key"></i> <?php echo __("Stream name/key"); ?>: </label>
-            <div class="input-group">
-                <span class="input-group-btn">
-                    <a class="btn btn-default" href="<?php echo $global['webSiteRootURL']; ?>plugin/Live/?resetKey=1" data-toggle="tooltip" title="<?php echo __("This also reset the Chat and views counter"); ?>"><i class="fa fa-refresh"></i> <?php echo __("Reset Key"); ?></a>
-                </span>
-                <?php
-                getInputCopyToClipboard('streamkey', $key);
-                ?>
-            </div>
-        </div>
-        <?php
-        if (!empty($onliveApplicationsButtons)) {
-        ?>
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <?php echo __('Active Livestreams'); ?>
-                </div>
-                <div class="panel-body myUsedKeys<?php echo $key; ?>">
-                    <?php echo implode('', $onliveApplicationsButtons); ?>
-                </div>
-            </div>
-        <?php
-        }
-        ?>
-
-        <div class="form-group <?php echo getCSSAnimationClassAndStyle('animate__fadeInLeft', 'live'); ?>"  id="ServerURLName">
-            <label for="serverAndStreamkey"><i class="fa fa-key"></i> <?php echo __("Server URL"); ?> + <?php echo __("Stream name/key"); ?>:</label>
-            <?php
-            getInputCopyToClipboard('serverAndStreamkey', Live::getRTMPLink(User::getId()));
-            ?>
-        </div>
-    </div>
-    <div class="panel-footer">        
-        <!-- Insert the recommended settings panel here -->
-        <?php include __DIR__.'/recommended_stream_settings.php'; ?>  
-    </div>
-</div>
+<?php
+if (AVideoPlugin::isEnabledByName('WebRTC')) {
+    include $global['systemRootPath'] . 'plugin/Live/tabs/tabStreamSettings.webcam.php';
+} else {
+    include $global['systemRootPath'] . 'plugin/Live/tabs/tabStreamSettings.software.php';
+}
+?>
 <div class="tabbable-line <?php echo getCSSAnimationClassAndStyle('animate__fadeInLeft', 'live'); ?>">
     <ul class="nav nav-tabs">
         <li class="active">
@@ -123,7 +75,7 @@ if (AVideoPlugin::isEnabledByName('Rebroadcaster')) {
 
             <div class="panel panel-default">
                 <div class="panel-heading">
-                    <i class="fas fa-cog"></i> <?php echo __("Stream Settings"); ?>        
+                    <i class="fas fa-cog"></i> <?php echo __("Stream Settings"); ?>
                 </div>
                 <div class="panel-body">
                     <div class="row">
@@ -147,10 +99,25 @@ if (AVideoPlugin::isEnabledByName('Rebroadcaster')) {
                             } else {
                             ?>
                                 <div class="form-group" id="publiclyListed">
-                                    <span class="fa fa-globe"></span> <?php echo __("Make Stream Publicly Listed"); ?>
+                                    <i class="fas fa-broadcast-tower"></i> <?php echo __("Make Stream Publicly Listed"); ?>
                                     <div class="material-switch pull-right">
-                                        <input id="listed" type="checkbox" value="1" <?php echo !empty($trasnmition['public']) ? "checked" : ""; ?> onchange="saveStream();" />
+                                        <input id="listed" type="checkbox" value="1" <?php echo !empty($trasnmition['public']) ? "checked" : ""; ?> onchange="saveStream(this);" />
                                         <label for="listed" class="label-success"></label>
+                                    </div>
+                                </div>
+                            <?php
+                            }
+                            if (!empty($objLive->hideIsRebroadcastOption)) {
+                            ?>
+                                <input id="isRebroadcast" type="hidden" value="0" />
+                            <?php
+                            } else {
+                            ?>
+                                <div class="form-group" id="publiclyListed">
+                                    <i class="fas fa-retweet"></i> <?php echo __("Mark this stream as a Rebroadcast"); ?>
+                                    <div class="material-switch pull-right">
+                                        <input id="isRebroadcast" type="checkbox" value="1" <?php echo !empty($trasnmition['isRebroadcast']) ? "checked" : ""; ?> onchange="saveStream(this);" />
+                                        <label for="isRebroadcast" class="label-success"></label>
                                     </div>
                                 </div>
                                 <?php
@@ -168,9 +135,9 @@ if (AVideoPlugin::isEnabledByName('Rebroadcaster')) {
                                 if ($SendRecordedToEncoderCanAutoRecord || ($SendRecordedToEncoderCanApprove && $SendRecordedToEncoderObjectData->usersCanSelectAutoRecord)) {
                                 ?>
                                     <div class="form-group">
-                                        <span class="fa fa-globe"></span> <?php echo __("Auto record this live"); ?>
+                                        <i class="fas fa-circle"></i> <?php echo __("Auto record this live"); ?>
                                         <div class="material-switch pull-right">
-                                            <input id="recordLive" type="checkbox" value="1" <?php echo SendRecordedToEncoder::userApproved(User::getId()) ? "checked" : ""; ?> onchange="saveStream();" />
+                                            <input id="recordLive" type="checkbox" value="1" <?php echo SendRecordedToEncoder::recordOptionIsChecked(User::getId()) ? "checked" : ""; ?> onchange="saveStream(this);" />
                                             <label for="recordLive" class="label-success"></label>
                                         </div>
                                     </div>
@@ -215,13 +182,19 @@ if (AVideoPlugin::isEnabledByName('Rebroadcaster')) {
                 <div class="panel-heading"><?php echo __("Groups That Can See This Stream"); ?><br><small><?php echo __("Uncheck all to make it public"); ?></small></div>
                 <div class="panel-body">
                     <?php
-                    $ug = UserGroups::getAllUsersGroups();
+                    $ug = $liveGroups = array();
+                    if (empty($objLive->hideUserGroups) && !empty($trasnmition)) {
+                        $trans = new LiveTransmition($trasnmition['id']);
+                        $liveGroups = $trans->getGroups();
+                        $ug = UserGroups::getAllUsersGroups();
+                    }
+
                     foreach ($ug as $value) {
                     ?>
                         <div class="form-group">
                             <span class="fa fa-users"></span> <?php echo $value['group_name']; ?>
                             <div class="material-switch pull-right">
-                                <input id="group<?php echo $value['id']; ?>" type="checkbox" value="<?php echo $value['id']; ?>" class="userGroups" <?php echo (in_array($value['id'], $groups) ? "checked" : "") ?> />
+                                <input id="group<?php echo $value['id']; ?>" type="checkbox" value="<?php echo $value['id']; ?>" class="userGroups" <?php echo (in_array($value['id'], $liveGroups) ? "checked" : "") ?> />
                                 <label for="group<?php echo $value['id']; ?>" class="label-success"></label>
                             </div>
                         </div>

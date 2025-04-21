@@ -530,9 +530,10 @@ if (!class_exists('Video')) {
 
             $this->views_count = intval($this->views_count);
 
-            if (empty($this->order) || empty($this->id)) {
+            if (empty(intval($this->order)) || empty($this->id)) {
                 $this->order = 'NULL';
             } else {
+                _error_log('Video::save update order ' . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
                 $this->order = intval($this->order);
             }
 
@@ -904,12 +905,12 @@ if (!class_exists('Video')) {
                             'aVideoEncoder.json.php',
                             'on_record_done.php'
                         );
-                        
+
                         if (!in_array(basename($_SERVER['SCRIPT_NAME']), $notTriggerOnNewVideo)) {
                             AVideoPlugin::onNewVideo($this->id);
                         } else {
                             _error_log("Video::setStatus({$status}) do not trigger onNewVideo on file " . basename($_SERVER['SCRIPT_NAME']));
-                        }                        
+                        }
                     } else {
                         _error_log("Video::setStatus({$status}) clearCache only ");
                     }
@@ -1174,7 +1175,7 @@ if (!class_exists('Video')) {
                     if (!empty($_REQUEST['current']) && $_REQUEST['current'] == 1) {
                         $rows = VideoStatistic::getVideosWithMoreViews(Video::SORT_TYPE_VIEWABLE, $showOnlyLoggedUserVideos, $showUnlisted, $suggestedOnly);
                     }
-                    //var_dump($_REQUEST['current'], $rows); 
+                    //var_dump($_REQUEST['current'], $rows);
                     $ids = [];
                     foreach ($rows as $row) {
                         $ids[] = $row['id'];
@@ -1281,7 +1282,7 @@ if (!class_exists('Video')) {
                     $videosArrayId = VideoTags::getAllVideosIdFromTagsId($_GET['tags_id']);
                 }
             }
-            _mysql_connect();
+            //_mysql_connect();
             $sql = "SELECT STRAIGHT_JOIN  u.*, u.externalOptions as userExternalOptions, v.*, "
                 . " nv.title as next_title,"
                 . " nv.clean_title as next_clean_title,"
@@ -1352,20 +1353,24 @@ if (!class_exists('Video')) {
             if ($status == Video::SORT_TYPE_VIEWABLE) {
                 $sql .= " AND ( ";
                 $sql .= " v.status IN ('" . implode("','", Video::getViewableStatus($showUnlisted)) . "')";
+                /* If I keep the code below it will appear on first page
                 if (User::isAdmin()) {
                     $sql .= " OR v.status = '" . Video::$statusUnpublished . "' ";
                 } else if (User::isLogged()) {
                     $sql .= " OR (v.status = '" . Video::$statusUnpublished . "' AND v.users_id = '" . User::getId() . "' )";
                 }
+                */
                 $sql .= " )";
             } elseif ($status == Video::SORT_TYPE_VIEWABLENOTUNLISTED) {
                 $sql .= " AND ( ";
                 $sql .= " v.status IN ('" . implode("','", Video::getViewableStatus(false)) . "')";
+                /*If I keep the code below it will appear on first page
                 if (User::isAdmin()) {
                     $sql .= " OR v.status = '" . Video::$statusUnpublished . "' ";
                 } else if (User::isLogged()) {
                     $sql .= " OR (v.status = '" . Video::$statusUnpublished . "' AND v.users_id = '" . User::getId() . "' )";
                 }
+                    */
                 $sql .= " )";
             } elseif (!empty($status) && strlen($status) == 1) {
                 $sql .= " AND v.status = '{$status}'";
@@ -1465,7 +1470,7 @@ if (!class_exists('Video')) {
             }
             if (strpos($sql, 'v.id IN') === false && !preg_match('/LIMIT\s+\d+/i', preg_replace('/\([^\)]*\)/', '', $sql))) {
                 $sql .= " LIMIT {$firstClauseLimit}1";
-            }            
+            }
             $lastGetVideoSQL = $sql;
             //echo $sql, "<br>";//var_dump(debug_backtrace());exit;
             $res = sqlDAL::readSql($sql);
@@ -1491,7 +1496,7 @@ if (!class_exists('Video')) {
             sqlDAL::close($res);
             if ($res !== false) {
                 require_once $global['systemRootPath'] . 'objects/userGroups.php';
-                
+
                 if (!empty($video)) {
                     $video = self::getInfo($video);
                 }
@@ -1763,7 +1768,7 @@ if (!class_exists('Video')) {
                 $passwordProtectedOnly = true;
                 $status = '';
             }
-            $sql = "SELECT STRAIGHT_JOIN  u.*, u.externalOptions as userExternalOptions, v.*, c.iconClass, 
+            $sql = "SELECT STRAIGHT_JOIN  u.*, u.externalOptions as userExternalOptions, v.*, c.iconClass,
                     c.name as category, c.order as category_order, c.clean_name as clean_category,c.description as category_description,"
                 . " v.created as videoCreation, v.modified as videoModified "
                 //. ", (SELECT count(id) FROM likes as l where l.videos_id = v.id AND `like` = 1 ) as likes "
@@ -1866,7 +1871,7 @@ if (!class_exists('Video')) {
                 }
             }
 
-            //var_dump($max_duration_in_seconds);echo $sql;exit;            
+            //var_dump($max_duration_in_seconds);echo $sql;exit;
             $sql .= Video::getCatSQL();
 
             if (!empty($_GET['search'])) {
@@ -2373,8 +2378,8 @@ if (!class_exists('Video')) {
                 return false;
             }
             TimeLogStart("Video::updateFilesize {$videos_id}");
-            ini_set('max_execution_time', 300); // 5
-            set_time_limit(300);
+            //ini_set('max_execution_time', 300); // 5
+            //set_time_limit(300);
             $video = new Video("", "", $videos_id, true);
             $_type = $video->getType();
             if ($_type !== 'video' && $_type !== 'audio') {
@@ -3375,6 +3380,7 @@ if (!class_exists('Video')) {
             if (!Permissions::canAdminVideos()) {
                 return false;
             }
+            _error_log("video::updateOrder($videos_id, $order) " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             $sql = "UPDATE videos SET `order` = ?, modified = now() WHERE id = ?";
             return sqlDAL::writeSql($sql, "ii", [$order, $videos_id]);
         }
@@ -4163,7 +4169,7 @@ if (!class_exists('Video')) {
                         $f = "{$filename}/index{$type}";
                     } else if ($indexMP3Exits) {
                         $f = "{$filename}/index{$type}";
-                    }  else if ($indexMP4Exits) {
+                    } else if ($indexMP4Exits) {
                         $f = "{$filename}/index{$type}";
                     } else {
                         $f = "{$paths['relative']}{$filename}{$type}";
@@ -4173,38 +4179,48 @@ if (!class_exists('Video')) {
                     TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
                     //$source['url'] = addQueryStringParameter($source['url'], 'cache', uniqid());
                     $source['url_noCDN'] = $source['url'];
+                    $source['line'] = __LINE__;
                 } elseif (!empty($yptStorage) && !empty($site) && $isValidType && $fsize < 20) {
                     $siteURL = getCDNOrURL($site->getUrl(), 'CDN_YPTStorage', $video['sites_id']);
                     TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
                     $source['url'] = "{$siteURL}{$paths['relative']}{$filename}{$type}";
                     $source['url_noCDN'] = $site->getUrl() . "{$paths['relative']}{$filename}{$type}";
+                    $source['line'] = __LINE__;
                     if ($type == ".m3u8" || $indexMP3Exits) {
                         $source['url'] = "{$siteURL}videos/{$filename}/index{$type}";
                         $source['url_noCDN'] = "{$global['webSiteRootURL']}videos/{$filename}/index{$type}";
-                    }else if ($indexMP4Exits) {
+                        $source['line'] = __LINE__;
+                    } else if ($indexMP4Exits || $indexMP3Exits) {
                         $source['url'] = "{$siteURL}videos/{$filename}/index{$type}";
                         $source['url_noCDN'] = "{$global['webSiteRootURL']}videos/{$filename}/index{$type}";
+                        $source['line'] = __LINE__;
                     }
                 } elseif (!empty($advancedCustom->videosCDN) && $canUseCDN) {
                     $advancedCustom->videosCDN = addLastSlash($advancedCustom->videosCDN);
                     $source['url'] = "{$advancedCustom->videosCDN}{$paths['relative']}{$filename}{$type}";
                     $source['url_noCDN'] = "{$global['webSiteRootURL']}{$paths['relative']}{$filename}{$type}";
+                    $source['line'] = __LINE__;
                     if ($type == ".m3u8" || $indexMP3Exits) {
                         $source['url'] = "{$advancedCustom->videosCDN}videos/{$filename}/index{$type}";
                         $source['url_noCDN'] = "{$global['webSiteRootURL']}videos/{$filename}/index{$type}";
-                    }else if ($indexMP4Exits) {
+                        $source['line'] = __LINE__;
+                    } else if ($indexMP4Exits || $indexMP3Exits) {
                         $source['url'] = "{$advancedCustom->videosCDN}videos/{$filename}/index{$type}";
                         $source['url_noCDN'] = "{$global['webSiteRootURL']}videos/{$filename}/index{$type}";
+                        $source['line'] = __LINE__;
                     }
                 } else {
                     $source['url'] = getCDN() . "{$paths['relative']}{$filename}{$type}";
                     $source['url_noCDN'] = "{$global['webSiteRootURL']}{$paths['relative']}{$filename}{$type}";
+                    $source['line'] = __LINE__;
                     if ($type == ".m3u8" || $indexMP3Exits) {
                         $source['url'] = getCDN() . "videos/{$filename}/index{$type}";
                         $source['url_noCDN'] = "{$global['webSiteRootURL']}videos/{$filename}/index{$type}";
-                    }else if ($indexMP4Exits) {
+                        $source['line'] = __LINE__;
+                    } else if ($indexMP4Exits || $indexMP3Exits) {
                         $source['url'] = getCDN() . "videos/{$filename}/index{$type}";
                         $source['url_noCDN'] = "{$global['webSiteRootURL']}videos/{$filename}/index{$type}";
+                        $source['line'] = __LINE__;
                     }
                 }
                 TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
@@ -4215,24 +4231,37 @@ if (!class_exists('Video')) {
                         if (!empty($cdn_obj->enable_storage)) {
                             if ($type === '.m3u8') {
                                 $source['url'] = CDNStorage::getURL("{$filename}/index.m3u8");
+                                $source['line'] = __LINE__;
+                            } else if ($type === '.mp4' && $indexMP4Exits) {
+                                //var_dump("{$filename}/index.mp4");
+                                $source['url'] = CDNStorage::getURL("{$filename}/index.mp4");
+                                $source['line'] = __LINE__;
+                            } else if ($type === '.mp3' && $indexMP3Exits) {
+                                //var_dump("{$filename}/index.mp4");
+                                $source['url'] = CDNStorage::getURL("{$filename}/index.mp3");
+                                $source['line'] = __LINE__;
                             } else {
                                 $source['url'] = CDNStorage::getURL("{$filename}{$type}");
+                                $source['line'] = __LINE__;
                             }
                             $source['url_noCDN'] = $source['url'];
                             TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
                         } elseif (!empty($aws_s3)) {
                             $source = $aws_s3->getAddress("{$filename}{$type}");
                             $source['url_noCDN'] = $source['url'];
+                            $source['line'] = __LINE__;
                             $source['url'] = replaceCDNIfNeed($source['url'], 'CDN_S3');
                             TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
                         } elseif (!empty($bb_b2)) {
                             $source = $bb_b2->getAddress("{$filename}{$type}");
                             $source['url_noCDN'] = $source['url'];
+                            $source['line'] = __LINE__;
                             $source['url'] = replaceCDNIfNeed($source['url'], 'CDN_B2');
                             TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
                         } elseif (!empty($ftp)) {
                             $source = $ftp->getAddress("{$filename}{$type}");
                             $source['url_noCDN'] = $source['url'];
+                            $source['line'] = __LINE__;
                             $source['url'] = replaceCDNIfNeed($source['url'], 'CDN_FTP');
                             TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
                         }
@@ -4266,6 +4295,7 @@ if (!class_exists('Video')) {
                 }
                 $source['url'] = addQueryStringParameter($source['url'], 'cache', $x);
                 $source['url_noCDN'] = addQueryStringParameter($source['url_noCDN'], 'cache', $x);
+                $source['line'] = __LINE__;
             }
             /*
             if($filename == "video_230813150408_va39e" && $type == '.m3u8'){
@@ -4282,6 +4312,7 @@ if (!class_exists('Video')) {
                 }
                 $source['url'] = $secure->addToken($source['url'], $filename);
                 $source['url_noCDN'] = $secure->addToken($source['url_noCDN'], $filename);
+                $source['line'] = __LINE__;
             }
 
             TimeLogEnd($timeLog1, __LINE__, $timeLog1Limit);
@@ -4330,7 +4361,6 @@ if (!class_exists('Video')) {
                 return $__getPaths[$videoFilename];
             }
             $cleanVideoFilename = self::getCleanFilenameFromFile($videoFilename);
-            //var_dump('--'.$cleanVideoFilename, '++'.$videoFilename);
             $videosDir = self::getStoragePath();
 
             $path = addLastSlash("{$videosDir}{$cleanVideoFilename}");
@@ -4339,13 +4369,30 @@ if (!class_exists('Video')) {
             if ($createDir) {
                 make_path(addLastSlash($path));
             }
+
             $relative = addLastSlash("videos/{$cleanVideoFilename}");
             if (preg_match('/\.vtt$/', $videoFilename)) {
                 $url = $global['webSiteRootURL'] . "{$relative}";
             } else {
                 $url = getCDN() . "{$relative}";
             }
-            $__getPaths[$videoFilename] = ['filename' => $cleanVideoFilename, 'path' => $path, 'url' => $url, 'relative' => $relative];
+            if ($cleanVideoFilename == 'index' && preg_match('/index.mp4$/', $videoFilename)) {
+                $folder = str_replace('/index.mp4', '', $videoFilename);
+                $cleanVideoFilename = "$folder/index.mp4";
+                $relative = ("videos/{$cleanVideoFilename}");
+                $path = ("{$videosDir}{$cleanVideoFilename}");
+                $url = getCDN() . "{$cleanVideoFilename}";
+                $__getPaths[$videoFilename] = ['filename' => $cleanVideoFilename, 'path' => $path, 'url' => $url, 'relative' => $relative, 'videoFilename' => $videoFilename];
+            } else if ($cleanVideoFilename == 'index' && preg_match('/index.mp3$/', $videoFilename)) {
+                $folder = str_replace('/index.mp3', '', $videoFilename);
+                $cleanVideoFilename = "$folder/index.mp3";
+                $relative = ("videos/{$cleanVideoFilename}");
+                $path = ("{$videosDir}{$cleanVideoFilename}");
+                $url = getCDN() . "{$cleanVideoFilename}";
+                $__getPaths[$videoFilename] = ['filename' => $cleanVideoFilename, 'path' => $path, 'url' => $url, 'relative' => $relative, 'videoFilename' => $videoFilename];
+            } else {
+                $__getPaths[$videoFilename] = ['filename' => $cleanVideoFilename, 'path' => $path, 'url' => $url, 'relative' => $relative, 'videoFilename' => $videoFilename];
+            }
             return $__getPaths[$videoFilename];
         }
 
@@ -4566,7 +4613,7 @@ if (!class_exists('Video')) {
             }
 
             $path_parts = pathinfo($cleanName);
-            //var_dump($filename, $cleanName, $path_parts);         
+            //var_dump($filename, $cleanName, $path_parts);
             if (empty($path_parts['extension'])) {
                 //_error_log("Video::getCleanFilenameFromFile could not find extension of ".$filename);
                 if (!empty($path_parts['filename'])) {
@@ -4860,7 +4907,8 @@ if (!class_exists('Video')) {
 
         public static function getSourceFileURL($filename, $includeS3 = false, $fileType = '')
         {
-            $sources = self::getVideosPaths($filename, $includeS3);
+            $recreate = recreateCache();
+            $sources = self::getVideosPaths($filename, $includeS3, 0, $recreate);
             if (empty($fileType) || $fileType == 'audio') {
                 if (!empty($sources['mp3'])) {
                     return $sources['mp3'];
@@ -4880,7 +4928,7 @@ if (!class_exists('Video')) {
             return false;
         }
 
-        public static function getVideosPaths($filename, $includeS3 = false, $try = 0)
+        public static function getVideosPaths($filename, $includeS3 = false, $try = 0, $recreate = false)
         {
             global $global;
 
@@ -4890,13 +4938,16 @@ if (!class_exists('Video')) {
 
             $tmpCacheFile = getVideosDir() . "permanentCache" . DIRECTORY_SEPARATOR . "getVideosPaths_{$filename}_" . ($includeS3 ? 1 : 0) . ".tmp";
 
-            if (!empty($cache)) {
+            if (!empty($cache) && empty($recreate)) {
                 $obj = object_to_array(_json_decode($cache));
                 if (!file_exists($tmpCacheFile)) {
                     file_put_contents($tmpCacheFile, json_encode($cache));
                 }
+                if (!empty($_REQUEST['debug'])) {
+                    _error_log("getVideosPaths($filename) line=" . __LINE__);
+                }
                 return $obj;
-            } elseif (empty($global['disableAsyncGetVideosPaths']) && file_exists($tmpCacheFile)) {
+            } elseif (empty($global['disableAsyncGetVideosPaths']) && file_exists($tmpCacheFile) && empty($recreate)) {
                 _error_log("getVideosPaths($filename) 1 tmpCacheFile=$tmpCacheFile " . json_encode(ObjectYPT::getLastUsedCacheInfo()));
                 // Execute the async process to generate the cache
                 $device = getDeviceName('web');
@@ -4904,12 +4955,15 @@ if (!class_exists('Video')) {
 
                 // Return the temporary cache file content if it exists
                 $tmpCacheContent = file_get_contents($tmpCacheFile);
+                if (!empty($_REQUEST['debug'])) {
+                    _error_log("getVideosPaths($filename) line=" . __LINE__);
+                }
                 return object_to_array(_json_decode($tmpCacheContent));
             } else {
                 // Call the function to generate the video paths
                 $videos = self::_getVideosPaths($filename, $includeS3, $try);
 
-                make_path( dirname($tmpCacheFile));
+                make_path($tmpCacheFile);
 
                 // Save the results in the temporary cache file
                 file_put_contents($tmpCacheFile, json_encode($videos));
@@ -4917,6 +4971,9 @@ if (!class_exists('Video')) {
                 // Save the results in the main cache
                 $resp = $videoCache->setCache($videos);
                 //_error_log("getVideosPaths($filename) 2 ".json_encode($resp));
+                if (!empty($_REQUEST['debug'])) {
+                    _error_log("getVideosPaths($filename) line=" . __LINE__);
+                }
                 return $videos;
             }
         }
@@ -4995,7 +5052,7 @@ if (!class_exists('Video')) {
             }
             $allowedExtensions = array('mp4');
             $dirHandle = opendir($dir);
-            if(empty($dirHandle)){
+            if (empty($dirHandle)) {
                 _error_log("Could not open dir $dir", AVideoLog::$ERROR);
                 return array();
             }
@@ -5393,8 +5450,8 @@ if (!class_exists('Video')) {
             }
             /*
 
-            Previously, the canonical URL was set to the shortened format "https://mysite.com/v/40701". 
-            However, to maintain consistency with the actual structure of our site URLs and to ensure clarity for search engines, 
+            Previously, the canonical URL was set to the shortened format "https://mysite.com/v/40701".
+            However, to maintain consistency with the actual structure of our site URLs and to ensure clarity for search engines,
             we've updated the canonical URL to match the actual URL format: "https://mysite.com/video/40701".
 
             This change is intended to:
@@ -5675,6 +5732,7 @@ if (!class_exists('Video')) {
                 self::deleteThumbs($filename, true);
             }
 
+            //_error_log("clearCache($videos_id, $deleteThumbs, $clearFirstPageCache, $async) " . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             if ($async) {
                 $videos_id = intval($videos_id);
                 $deleteThumbs = !empty($deleteThumbs) ? 'true' : 'false';
@@ -6063,6 +6121,12 @@ if (!class_exists('Video')) {
             // check if the video is not public
             $rows = UserGroups::getVideosAndCategoriesUserGroups($videos_id);
             if (empty($rows)) {
+                if (empty($users_id)) {
+                    $video = new Video('', '', $videos_id);
+                    if ($video->getOnly_for_paid()) {
+                        return false;
+                    }
+                }
                 return true;
             }
 

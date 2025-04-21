@@ -15,7 +15,7 @@ if (User::canStream()) {
     if (empty($obj->doNotShowGoLiveButton)) {
 ?>
         <li>
-            <a id="TopCopyKeysButton" href="<?php echo "{$global['webSiteRootURL']}plugin/Live"; ?>" class="faa-parent animated-hover btn btn-danger navbar-btn"
+            <a id="GoLiveButton" href="<?php echo "{$global['webSiteRootURL']}plugin/Live"; ?>" class="faa-parent animated-hover btn btn-danger navbar-btn"
                 data-toggle="tooltip" title="<?php echo __("Broadcast a Live Stream"); ?>"
                 data-placement="bottom">
                 <i class="fa fa-circle faa-flash"></i> <span class="hidden-md hidden-sm hidden-mdx"><?php echo __($buttonTitle); ?></span>
@@ -357,8 +357,13 @@ if (User::canStream()) {
                 $('#liveScheduleVideos .extraVideos').append(html);
                 $('#liveScheduleVideos').slideDown();
             } else {
-                $('#liveVideos .extraVideos').prepend(html);
-                $('#liveVideos').slideDown();
+                if(typeof application.isRebroadcast !== 'undefined' && !empty(application.isRebroadcast) && $('#rebroadcastVideos').length){
+                    $('#rebroadcastVideos .extraVideos').prepend(html);
+                    $('#rebroadcastVideos').slideDown();
+                }else{
+                    $('#liveVideos .extraVideos').prepend(html);
+                    $('#liveVideos').slideDown();
+                }
             }
             processUserNotificationFromApplication(application);
 
@@ -433,6 +438,19 @@ if (User::canStream()) {
                 $('#liveVideos').slideUp();
             }
         });
+        $('#rebroadcastVideos .extraVideos').each(function(index, currentElement) {
+            var somethingIsVisible = false;
+            $(this).children('div').each(function(index2, currentElement2) {
+                if ($(this).is(":visible")) {
+                    somethingIsVisible = true;
+                    return false;
+                }
+            });
+            if (!somethingIsVisible) {
+                $('#rebroadcastVideos').slideUp();
+            }
+        });
+
     }
 
     $(document).ready(function() {

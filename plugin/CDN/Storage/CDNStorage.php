@@ -282,7 +282,7 @@ class CDNStorage
 
     public static function setSite($videos_id, $isOnTheStorage)
     {
-        _mysql_connect();
+        //_mysql_connect();
         $v = new Video('', '', $videos_id);
         if ($isOnTheStorage) {
             $site = self::getOrCreateSite();
@@ -604,7 +604,7 @@ class CDNStorage
                 $remote_file = CDNStorage::filenameToRemotePath($value);
                 _error_log("CDNStorage::putUsingAPI {$remote_file} ");
                 $client->upload($value, $remote_file);
-                $totalBytesTransferred += $filesize; // Update remaining size 
+                $totalBytesTransferred += $filesize; // Update remaining size
             } else {
                 _error_log("CDNStorage::putUsingAPI invalid filesize [$filesize] " . json_encode($value));
             }
@@ -1203,7 +1203,11 @@ class CDNStorage
         }
 
         $paths = Video::getPaths($filename);
-        $file = $paths['path'] . $filename;
+        if(!preg_match('/index.mp[34]$/', $paths['path'])){
+            $file = $paths['path'] . $filename;
+        }else{
+            $file = $paths['path'];
+        }
         if (!file_exists($file)) {
             $file = $paths['path'] . $filename;
         }
@@ -1220,6 +1224,8 @@ class CDNStorage
             return Video::getURLToFile($filename);
         }
         if (preg_match('/m3u8$/', $filename)) {
+            $relativeFilename = $filename;
+        } else if (preg_match('/index.mp[34]$/', $filename)) {
             $relativeFilename = $filename;
         } else {
             $relativeFilename = "{$paths['filename']}/{$filename}";
@@ -1352,6 +1358,7 @@ class CDNStorage
         $parts2 = explode('?', $parts1[1]);
         $relativeFilename = $parts2[0];
         $localFile = getVideosDir() . "{$relativeFilename}";
+        $localFile = str_replace('/videos/videos/', '/videos/', $localFile);
         //var_dump($localFile);exit;
         $returnURL = false;
         if (file_exists($localFile)) {

@@ -122,7 +122,7 @@ function getMySQLDate()
 function _mysql_connect($persistent = false, $try = 0)
 {
     global $global, $mysqlHost, $mysqlUser, $mysqlPass, $mysqlDatabase, $mysqlPort, $mysql_connect_was_closed, $mysql_connect_is_persistent, $isStandAlone;
-    if(!empty($isStandAlone)){
+    if (!empty($isStandAlone)) {
         _error_log('StandAlone Mode');
         return false;
     }
@@ -130,7 +130,7 @@ function _mysql_connect($persistent = false, $try = 0)
 
     foreach ($checkValues as $value) {
         if (!isset($$value)) {
-            _error_log("_mysql_connect Variable NOT set $value ".json_encode(debug_backtrace()));
+            _error_log("_mysql_connect Variable NOT set $value " . json_encode(debug_backtrace()));
         }
     }
 
@@ -140,7 +140,7 @@ function _mysql_connect($persistent = false, $try = 0)
                 _error_log('ERROR: mysqli class not loaded ' . php_ini_loaded_file());
                 die('ERROR: mysqli class not loaded');
             }
-            //_error_log('MySQL Connect '. json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+            //_error_log('MySQL Connect IP=' . getRealIpAddr() . ' UA=' . $_SERVER['HTTP_USER_AGENT'] . ' ' . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
             $mysql_connect_was_closed = 0;
             $mysql_connect_is_persistent = $persistent;
             $global['mysqli'] = new mysqli(($persistent ? 'p:' : '') . $mysqlHost, $mysqlUser, $mysqlPass, '', @$mysqlPort);
@@ -190,11 +190,49 @@ function _mysql_commit()
     }
 }
 
+/**
+ * Determines if it's safe to close the MySQL connection.
+ *
+ * @return bool True if the connection can be closed, false otherwise.
+ */
+function canCloseConnection()
+{
+    // Do not close connection on the main frontend rendering page
+    if (!empty($_SERVER['SCRIPT_NAME']) && $_SERVER['SCRIPT_NAME'] === '/view/modeYoutube.php') {
+        return false;
+    }
+
+    global $mysql_connect_is_persistent;
+
+    // Don't close if connection is persistent
+    if ($mysql_connect_is_persistent) {
+        return false;
+    }
+
+    // Don't close if MySQL is not open
+    if (!_mysql_is_open()) {
+        return false;
+    }
+
+    // Don't close if running in CLI
+    if (isCommandLineInterface()) {
+        return false;
+    }
+
+    // Don't close if request is from localhost
+    if (getRealIpAddr() === '127.0.0.1') {
+        return false;
+    }
+
+    return true;
+}
+
+
 function _mysql_close()
 {
-    global $global, $mysql_connect_was_closed, $mysql_connect_is_persistent;
-    if (!$mysql_connect_is_persistent && _mysql_is_open()) {
-        //_error_log('MySQL Closed '. json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
+    global $global, $mysql_connect_was_closed;
+    if (canCloseConnection()) {
+        _error_log('MySQL Closed IP=' . getRealIpAddr() . ' ' . json_encode(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)));
         $mysql_connect_was_closed = 1;
         try {
             /**
@@ -209,24 +247,50 @@ function _mysql_close()
     }
 }
 
+
+/**
+ * Check if the MySQL connection is open and valid.
+ *
+ * @return bool True if the connection is open, false otherwise.
+ */
 function _mysql_is_open()
 {
     global $global, $mysql_connect_was_closed;
     try {
-        /**
-         *
-         * @var array $global
-         * @var object $global['mysqli']
-         */
-        //if (is_object($global['mysqli']) && (empty($mysql_connect_was_closed) || !empty(@$global['mysqli']->ping()))) {
-        if (!empty($global['mysqli']) && is_object($global['mysqli']) && empty($mysql_connect_was_closed) && isset($global['mysqli']->server_info) && is_resource($global['mysqli']) && get_resource_type($global['mysqli']) === 'mysql link') {
+        // Check that the mysqli object exists and is valid
+        if (empty($global['mysqli']) || !($global['mysqli'] instanceof mysqli)) {
+            //error_log("MySQL connection is not available or not an instance of mysqli.");
+            return false;
+        }
+
+        // Check if we've flagged the connection as closed
+        if (!empty($mysql_connect_was_closed)) {
+            //error_log("MySQL connection flagged as closed.");
+            return false;
+        }
+
+        // If there is a connection error, log it
+        if ($global['mysqli']->connect_errno) {
+            error_log("MySQL connection error: " . $global['mysqli']->connect_error);
+            return false;
+        }
+
+        $result = $global['mysqli']->query("SELECT 1");
+        if ($result) {
+            $result->free();
             return true;
+        } else {
+            error_log("MySQL connection test query failed. Connection appears to be closed. Error: " . $global['mysqli']->error);
+            return false;
         }
     } catch (Exception $exc) {
+        error_log("Exception in _mysql_is_open: " . $exc->getMessage());
         return false;
     }
-    return false;
+    return true;
 }
+
+
 
 
 function lockForUpdate($tableName, $condition)
@@ -364,7 +428,7 @@ function dumpMySQLDatabase($filePath, $extraOptions = [], &$status = [], $bfile 
 
     // Update lock file before executing the dump
     $status['step'] = 'Running mysqldump';
-    
+
     updateLockFile($status, $bfile);
 
     // Execute the command and wait for completion
@@ -388,11 +452,11 @@ function dumpMySQLDatabase($filePath, $extraOptions = [], &$status = [], $bfile 
 
 function updateLockFile($status, $bfile)
 {
-    
-    if(empty($bfile)){
+
+    if (empty($bfile)) {
         return false;
     }
-    
+
     // Check if the 'startTime' is already set, if not, set it to the current time
     if (!isset($status['startTime'])) {
         $status['startTime'] = date("Y-m-d H:i:s"); // Set the start time when the process starts

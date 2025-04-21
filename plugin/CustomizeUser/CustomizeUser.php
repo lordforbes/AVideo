@@ -496,16 +496,26 @@ class CustomizeUser extends PluginAbstract
 
     public static function canDownloadVideosFromUser($users_id)
     {
-        global $config;
+        global $config, $canDownloadVideosFromUserReason;
+        $canDownloadVideosFromUserReason = '';
         $obj = AVideoPlugin::getObjectDataIfEnabled("CustomizeUser");
         if (!empty($obj->nonAdminCannotDownload) && !User::isAdmin()) {
+            $canDownloadVideosFromUserReason = 'you selected nonAdminCannotDownload and you are not admin';
             return false;
         }
         if (empty($obj) || empty($obj->userCanAllowFilesDownload)) {
-            return self::canDownloadVideos();
+            $can = self::canDownloadVideos();
+            if(!$can){
+                $canDownloadVideosFromUserReason = 'your site configuration can download option is not checked';
+            }
+            return $can;
         }
         $user = new User($users_id);
-        return !empty($user->getExternalOption('userCanAllowFilesDownload'));
+        $can = !empty($user->getExternalOption('userCanAllowFilesDownload'));
+        if(!$can){
+            $canDownloadVideosFromUserReason = "you selected userCanAllowFilesDownload but the user {$users_id} the option 'Allow Download My Videos' on user profile is not checked";
+        }
+        return $can;
     }
 
     public static function canDownloadVideos()
@@ -626,7 +636,7 @@ class CustomizeUser extends PluginAbstract
 
     public static function canDownloadVideosFromVideo($videos_id)
     {
-        global $_lastCanDownloadVideosFromVideoReason;
+        global $_lastCanDownloadVideosFromVideoReason, $canDownloadVideosFromUserReason;
         $_lastCanDownloadVideosFromVideoReason = '';
         if (!CustomizeUser::canDownloadVideos()) {
             $obj = AVideoPlugin::getObjectDataIfEnabled("CustomizeUser");
@@ -644,7 +654,7 @@ class CustomizeUser extends PluginAbstract
         }
         $users_id = $video->getUsers_id();
         if (!CustomizeUser::canDownloadVideosFromUser($users_id)) {
-            $_lastCanDownloadVideosFromVideoReason = 'CustomizeUser::canDownloadVideosFromUser';
+            $_lastCanDownloadVideosFromVideoReason = 'CustomizeUser::canDownloadVideosFromUser - '.$canDownloadVideosFromUserReason;
             return false;
         }
         $category = new Category($video->getCategories_id());
@@ -972,7 +982,7 @@ class CustomizeUser extends PluginAbstract
 
       return $return;
       }
-     * 
+     *
      */
 
     static function getAffiliationNotifications()

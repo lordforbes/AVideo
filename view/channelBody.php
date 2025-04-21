@@ -29,7 +29,7 @@ if (empty($channelPassword) && !$isMyChannel) {
     $showUnlisted = true;
 }
 
-$ownerCanUplaodVideos = $user->getCanUpload() || $user->getIsAdmin();
+$ownerCanUplaodVideos = $user->getCanUpload() || $user->getIsAdmin() || AVideoPlugin::userCanUpload($user_id);
 //var_dump($ownerCanUplaodVideos, $user_id, $user);exit;
 $type = '';
 if ($ownerCanUplaodVideos && $advancedCustomUser->showArticlesTab && AVideoPlugin::isEnabledByName('Articles')) {
@@ -221,7 +221,7 @@ function getChannelTabClass($isTabButton, $isVideoTab = false)
             ?>
             <div class="row">
                 <div class="col-sm-12" style="display: flex;
-    align-items: center; 
+    align-items: center;
     justify-content: space-between;
     flex-wrap: wrap;">
                     <h2 class="pull-left" style="font-size: 2em;">
@@ -318,6 +318,7 @@ function getChannelTabClass($isTabButton, $isVideoTab = false)
                             <?php
                             }
                             if ($showChannelVideosTab) {
+                                echo PHP_EOL.'<!-- showChannelVideosTab -->'.PHP_EOL;
                             ?>
                                 <li class="nav-item <?php echo getChannelTabClass(true, true); ?>">
                                     <a class="nav-link " href="#channelVideos" data-toggle="tab" aria-expanded="false">
@@ -325,6 +326,16 @@ function getChannelTabClass($isTabButton, $isVideoTab = false)
                                     </a>
                                 </li>
                             <?php
+                            }else{
+                                if(!$advancedCustomUser->showChannelVideosTab){
+                                    echo PHP_EOL.'<!-- NOT showChannelVideosTab -->'.PHP_EOL;
+                                }
+                                if(!$ownerCanUplaodVideos){
+                                    echo PHP_EOL.'<!-- NOT ownerCanUplaodVideos -->'.PHP_EOL;
+                                }
+                                if(empty($uploadedVideos)){
+                                    echo PHP_EOL.'<!-- empty uploadedVideos -->'.PHP_EOL;
+                                }
                             }
                             if (!empty($uploadedTotalArticles)) {
                             ?>
@@ -349,7 +360,7 @@ function getChannelTabClass($isTabButton, $isVideoTab = false)
                                 <li class="nav-item <?php echo getChannelTabClass(true, false); ?>">
                                     <a class="nav-link " href="#channelImages" data-toggle="tab" aria-expanded="false">
                                     <i class="fa-solid fa-images"></i>
-                                    <span class="labelUpperCase"><?php echo __("Images"); ?></span> 
+                                    <span class="labelUpperCase"><?php echo __("Images"); ?></span>
                                     <span class="badge"><?php echo $uploadedTotalImages; ?></span>
                                     </a>
                                 </li>
@@ -463,9 +474,9 @@ function getChannelTabClass($isTabButton, $isVideoTab = false)
                                         </div>
 
                                         <div class="panel-footer">
-                                            <?php 
+                                            <?php
                                             //var_dump($totalPages);
-                                            echo getPagination($totalPages, "{$global['webSiteRootURL']}channel/{$_GET['channelName']}?current=_pageNum_"); 
+                                            echo getPagination($totalPages, "{$global['webSiteRootURL']}channel/{$_GET['channelName']}?current=_pageNum_");
                                             ?>
                                         </div>
                                     </div>

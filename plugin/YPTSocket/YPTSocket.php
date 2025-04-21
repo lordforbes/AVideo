@@ -1,8 +1,11 @@
 <?php
 
+use ElephantIO\Client;
+use ElephantIO\Engine\SocketIO\Version3X;
+
 /**
  * to stop
- * find who is using the port 
+ * find who is using the port
  * * lsof -i :25
  * Kill it
  * * kill -9 PID
@@ -47,7 +50,7 @@ class YPTSocket extends PluginAbstract
 
     public static function getServerVersion()
     {
-        return "7.3";
+        return "8.0";
     }
 
     public function updateScript()
@@ -57,12 +60,26 @@ class YPTSocket extends PluginAbstract
           if (AVideoPlugin::compareVersion($this->getName(), "2.0") < 0) {
           sqlDal::executeFile($global['systemRootPath'] . 'plugin/PayPerView/install/updateV2.0.sql');
           }
-         * 
+         *
          */
         return true;
     }
 
 
+    public static function getDataObjectDeprecated()
+    {
+        return array(
+            'forceNonSecure',
+            'uri',
+            'debugSocket',
+            'debugAllUsersSocket',
+            'allow_self_signed',
+            'forceNonSecure',
+            'showTotalOnlineUsersPerVideo',
+            'showTotalOnlineUsersPerLive',
+            'showTotalOnlineUsersPerLiveLink',
+        );
+    }
 
     public static function getDataObjectAdvanced()
     {
@@ -118,6 +135,8 @@ class YPTSocket extends PluginAbstract
         self::addDataObjectHelper('showTotalOnlineUsersPerLiveLink', 'Show Total Online Users Per LiveLink');
         $obj->enableCalls = false;
         self::addDataObjectHelper('enableCalls', 'Enable Meeting Calls', 'This feature requires the meet plugin enabled');
+
+        $obj->socketIO = true;
 
         return $obj;
     }
@@ -179,7 +198,97 @@ class YPTSocket extends PluginAbstract
     }
 
 
+    public static function sendIO($msg, $callbackJSFunction = "", $users_id = "", $send_to_uri_pattern = "")
+    {
+        global $global, $SocketSendObj, $SocketSendUsers_id, $SocketSendResponseObj, $SocketURL;
+
+        @_session_write_close();
+
+        if (!is_string($msg)) {
+            $msg = json_encode($msg);
+        }
+
+        // Ensure users_id is an array
+        $SocketSendUsers_id = is_array($users_id) ? $users_id : [$users_id];
+
+        // Prepare the WebSocket message object
+        $SocketSendObj = new stdClass();
+        $SocketSendObj->msg = $msg;
+        $SocketSendObj->isCommandLine = isCommandLineInterface();
+        $SocketSendObj->json = _json_decode($msg);
+        $SocketSendObj->webSocketToken = getEncryptedInfo(0, $send_to_uri_pattern, 'php');
+        $SocketSendObj->callback = $callbackJSFunction;
+
+        // Prepare the response object
+        $SocketSendResponseObj = new stdClass();
+        $SocketSendResponseObj->error = true;
+        $SocketSendResponseObj->msg = "";
+        $SocketSendResponseObj->msgObj = $SocketSendObj;
+        $SocketSendResponseObj->callbackJSFunction = $callbackJSFunction;
+
+        // Get WebSocket URL
+        //https://vlu.me:2053/socket.io/?EIO=4&transport=websocket
+        $SocketURL = self::getWebSocketURL(true, $SocketSendObj->webSocketToken, isDocker());
+        $SocketURL = str_replace(array('wss:', 'ws:'), array('https:', 'http:'), $SocketURL);
+        $SocketURL .= '&EIO=4&transport=websocket';
+        _error_log("Connecting to WebSocket: $SocketURL");
+
+        try {
+            // Create ElephantIO Client
+            $client = new Client(new Version3X($SocketURL, [
+                'context' => ['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]
+            ]));
+
+            $client->connect();
+            _error_log("WebSocket Connected to $SocketURL");
+
+            foreach ($SocketSendUsers_id as $index => $user_id) {
+                _error_log("Sending message to User ID: $user_id");
+
+                $SocketSendObj->to_users_id = $user_id;
+                $SocketSendObj = self::cleanupSocketSendObj($SocketSendObj);
+                $message = json_encode($SocketSendObj);
+
+                if ($message === false) {
+                    _error_log("JSON encoding failed: " . json_last_error_msg());
+                } else {
+                    $client->emit('message', [$message]);
+                    _error_log("Message sent to User ID: $user_id");
+                }
+            }
+
+            $client->disconnect();
+            _error_log("WebSocket Disconnected");
+
+            // Success Response
+            $SocketSendResponseObj->error = false;
+            $SocketSendResponseObj->msg = "Message sent successfully!";
+        } catch (Exception $e) {
+            _error_log("WebSocket Error: " . $e->getMessage());
+        }
+
+        return $SocketSendResponseObj;
+    }
+
+    public function getHeadCode()
+    {
+
+        $obj = AVideoPlugin::getDataObject('YPTSocket');
+        $js = '<script>const useSocketIO = '.($obj->socketIO?1:0).';</script>';
+        return $js;
+    }
+
     public static function send($msg, $callbackJSFunction = "", $users_id = "", $send_to_uri_pattern = "")
+    {
+        $obj = AVideoPlugin::getDataObject('YPTSocket');
+        if($obj->socketIO){
+            return self::sendIO($msg, $callbackJSFunction, $users_id, $send_to_uri_pattern);
+        }else{
+            return self::sendOLD($msg, $callbackJSFunction, $users_id, $send_to_uri_pattern);
+        }
+    }
+
+    public static function sendOLD($msg, $callbackJSFunction = "", $users_id = "", $send_to_uri_pattern = "")
     {
         global $global, $SocketSendObj, $SocketSendUsers_id, $SocketSendResponseObj, $SocketURL;
         _mysql_close();
@@ -197,7 +306,7 @@ class YPTSocket extends PluginAbstract
         $SocketSendObj->isCommandLine = isCommandLineInterface();
         $SocketSendObj->json = _json_decode($msg);
 
-        $SocketSendObj->webSocketToken = getEncryptedInfo(0, $send_to_uri_pattern);
+        $SocketSendObj->webSocketToken = getEncryptedInfo(0, $send_to_uri_pattern, 'php');
         $SocketSendObj->callback = $callbackJSFunction;
 
         $SocketSendResponseObj = new stdClass();
@@ -268,7 +377,6 @@ class YPTSocket extends PluginAbstract
         return $SocketSendResponseObj;
     }
 
-
     public static function getWebSocketURL($isCommandLine = false, $webSocketToken = '', $internalDocker = false)
     {
         global $global;
@@ -305,7 +413,7 @@ class YPTSocket extends PluginAbstract
     {
         $obj = AVideoPlugin::getDataObjectIfEnabled('YPTSocket');
         if (!empty($obj->enableCalls)) {
-            echo 'callerDisconnection(response);';
+            echo 'if(typeof callerDisconnection !== \'undefined\'){callerDisconnection(response);}';
         }
         echo 'socketDisconnection(response);';
         return '';
@@ -374,7 +482,18 @@ class YPTSocket extends PluginAbstract
     static public function getStartServerCommand()
     {
         global $global;
-        $command = "nohup bash -c 'ulimit -n 1048576 && php {$global['systemRootPath']}plugin/YPTSocket/server.php &'";
+
+        // Check if ulimit is supported
+        $ulimitCheck = "bash -c 'ulimit -n 1048576 >/dev/null 2>&1 && echo supported || echo unsupported'";
+        $isUlimitSupported = trim(shell_exec($ulimitCheck));
+
+        // Construct command based on ulimit support
+        if ($isUlimitSupported === 'supported') {
+            $command = "nohup bash -c 'ulimit -n 1048576 && php {$global['systemRootPath']}plugin/YPTSocket/server.php &'";
+        } else {
+            $command = "nohup bash -c 'php {$global['systemRootPath']}plugin/YPTSocket/server.php &'";
+        }
+
         return $command;
     }
 

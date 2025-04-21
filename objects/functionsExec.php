@@ -248,7 +248,7 @@ function zipDirectory($source, $destination)
     // Set memory limit and execution time to avoid issues with large files
     ini_set('memory_limit', '-1');
     set_time_limit(0);
-
+    make_path($source);
     // Check if the source directory exists
     if (!is_dir($source)) {
         _error_log("zipDirectory: Source directory does not exist: {$source}");
@@ -320,6 +320,66 @@ function zipDirectory($source, $destination)
     return file_exists($destinationOriginal);
 }
 
+function isPortOpenInternal($host, $port)
+{
+    $output = [];
+    $result = null;
+
+    // Check if 'nc' is available
+    exec("command -v nc", $output, $result);
+    if ($result === 0) {
+        // Use 'nc' to check the port
+        $output = [];
+        $result = null;
+        exec("nc -zv {$host} {$port} 2>&1", $output, $result);
+        foreach ($output as $line) {
+            error_log($line);
+        }
+        return $result === 0;
+    } else {
+        // Fallback to PHP socket method
+        //error_log("nc command not found, falling back to socket connection.");
+        $connection = @fsockopen($host, $port, $errno, $errstr, 5); // 5 seconds timeout
+        if ($connection) {
+            fclose($connection);
+            return true;
+        } else {
+            error_log("Socket error: $errstr");
+            return false;
+        }
+    }
+}
+
+
+function isLocalPortOpen($port)
+{
+    return isPortOpenInternal('127.0.0.1', $port);
+}
+
+function isPortOpenExternal($port, $timeout = 10)
+{
+    global $global;
+    global $isPortOpenExternalResponse;
+    $ports = array($port);
+    //postVariables($url, $array, $httpcodeOnly = true, $timeout = 10)
+    $isPortOpenExternalResponse = new stdClass();
+    $host = parse_url($global['webSiteRootURL'], PHP_URL_HOST);
+    $postURL = 'https://search.ypt.me/checkPorts.json.php';
+    $postURL = addQueryStringParameter($postURL, 'host', $host);
+    $response = postVariables($postURL, $ports, false, $timeout);
+    if (!empty($response)) {
+        $json = json_decode($response);
+        if (!empty($json)) {
+            $isPortOpenExternalResponse = $json;
+            $resp = $json->ports[0]->isOpen;
+            if($resp){
+                return true;
+            }
+        }
+    }
+    _error_log("isPortOpenExternal($port) {$response}");
+    return false;
+}
 
 function getPIDUsingPort($port)
 {
@@ -355,6 +415,21 @@ function getPIDUsingPort($port)
         }
     }
     return false;
+}
+
+function killProcessRuningOnPort($port) {
+    if (!empty($port)) {
+        _error_log('Searching for port: ' . $port);
+        //$command = 'netstat -ano | findstr ' . $port;
+        //exec($command, $output, $retval);
+        $pid = getPIDUsingPort($port);
+        if (!empty($pid)) {
+            _error_log('Server is already runing on port '.$port.' Killing, PID ' . $pid);
+            killProcess($pid);
+        } else {
+            _error_log('No Need to kill, port NOT found');
+        }
+    }
 }
 
 function canExecutePgrep()

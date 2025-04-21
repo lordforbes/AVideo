@@ -1,14 +1,17 @@
 <?php
 
-function getEncryptedInfo($timeOut = 0, $send_to_uri_pattern = "") {
+function getEncryptedInfo($timeOut = 0, $send_to_uri_pattern = "", $sentFrom = 'browser') {
     if (empty($timeOut)) {
         $timeOut = 43200; // valid for 12 hours
     }
     $msgObj = new stdClass();
+    $msgObj->isCommandLineInterface = isCommandLineInterface();
+    $msgObj->sentFrom = $sentFrom;
     $msgObj->from_users_id = User::getId();
     $msgObj->isAdmin = User::isAdmin();
     $msgObj->user_name = User::getNameIdentification();
     $msgObj->browser = get_browser_name();
+    $msgObj->os = getOS();
     $msgObj->yptDeviceId = getDeviceID(false);
     $msgObj->token = getToken($timeOut);
     $msgObj->time = time();
@@ -90,6 +93,7 @@ class SocketMessageType {
     const ON_LIVE_MSG = "ON_LIVE_MSG";
     const TESTING = "TESTING";
     const UNDEFINED = "UNDEFINED";
+    const MSG_BATCH = "MSG_BATCH";
 
 }
 
@@ -98,7 +102,7 @@ function getTotalViewsLive_key($live_key) {
         return false;
     }
     $live_key = object_to_array($live_key);
-    _mysql_connect();
+    //_mysql_connect();
     $liveUsersEnabled = \AVideoPlugin::isEnabledByName("LiveUsers");
     if ($liveUsersEnabled) {
         $liveUsers = new \LiveOnlineUsers(0);

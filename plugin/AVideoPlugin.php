@@ -237,7 +237,7 @@ class AVideoPlugin
         if (self::isDebuging(__FUNCTION__)) {
             return '<!-- AVideoPlugin::' . __FUNCTION__ . ' disabled -->';
         }
-        if(!empty($global['getFooterCodeAdded'])){
+        if (!empty($global['getFooterCodeAdded'])) {
             return '<!-- AVideoPlugin::' . __FUNCTION__ . ' already added -->';
         }
         $global['getFooterCodeAdded'] = 1;
@@ -406,7 +406,7 @@ class AVideoPlugin
                     $code = "\$p = new {$name}();";
                     eval($code);
                 } catch (\Throwable $th) {
-                    error_log("[loadPlugin] ".$th->getMessage(), AVideoLog::$ERROR);
+                    error_log("[loadPlugin] " . $th->getMessage(), AVideoLog::$ERROR);
                 }
                 if (is_object($p)) {
                     $pluginIsLoaded[$name] = $p;
@@ -417,7 +417,7 @@ class AVideoPlugin
                 error_log("loadPlugin($name) Error file not exists {$loadPluginFile}", AVideoLog::$ERROR);
             }
         }
-        
+
         return $pluginIsLoaded[$name];
     }
 
@@ -430,7 +430,7 @@ class AVideoPlugin
         if (!isset($_loadPluginIfEnabled)) {
             $_loadPluginIfEnabled = array();
         }
-        
+
         /**
          * @var array $global
          */
@@ -528,10 +528,10 @@ class AVideoPlugin
     public static function setParameter($name, $parameterName, $parameterValue = null)
     {
         $obj = AVideoPlugin::getObjectData($name);
-        if(!isset($parameterValue)){
+        if (!isset($parameterValue)) {
             unset($obj->{$parameterName});
             return false;
-        }else{
+        } else {
             $obj->{$parameterName} = $parameterValue;
             return true;
         }
@@ -703,7 +703,7 @@ class AVideoPlugin
 
     public static function isEnabled($uuid)
     {
-        if(!class_exists('Plugin')){
+        if (!class_exists('Plugin')) {
             return false;
         }
         return !empty(Plugin::getEnabled($uuid));
@@ -782,7 +782,7 @@ class AVideoPlugin
                 //echo $value['dirName'].PHP_EOL;
                 //_error_log('AVideoPlugin::getStart: '.$value['dirName']);
                 $p->getStart();
-            }//var_dump("----- nada ",$_REQUEST['live_index'], __LINE__, "-----");exit;
+            } //var_dump("----- nada ",$_REQUEST['live_index'], __LINE__, "-----");exit;
             //self::YPTend("{$value['dirName']}::".__FUNCTION__);
         }
     }
@@ -1157,7 +1157,7 @@ class AVideoPlugin
                     try {
                         $appArray = $p->getLiveApplicationArray();
                     } catch (\Throwable $th) {
-                        _error_log('AVideoPlugin::getLiveApplicationArray '.$th->getMessage(), AVideoLog::$ERROR);
+                        _error_log('AVideoPlugin::getLiveApplicationArray ' . $th->getMessage(), AVideoLog::$ERROR);
                         $appArray = array();
                     }
                     if (is_array($appArray)) {
@@ -1568,7 +1568,7 @@ class AVideoPlugin
 
     public static function userCanWatchVideo($users_id, $videos_id)
     {
-        global $userCanWatchVideoFunction;
+        global $userCanWatchVideoFunction, $userCanWatchVideoReason; // Add global variable for the reason
 
         if (!isset($userCanWatchVideoFunction)) {
             $userCanWatchVideoFunction = [];
@@ -1577,29 +1577,36 @@ class AVideoPlugin
             $userCanWatchVideoFunction[$users_id] = [];
         }
         if (isset($userCanWatchVideoFunction[$users_id][$videos_id])) {
+            $userCanWatchVideoReason = "Cached result found for user $users_id and video $videos_id";
             return $userCanWatchVideoFunction[$users_id][$videos_id];
         }
 
         $cacheName = "userCanWatchVideo($users_id, $videos_id)";
         $cache = ObjectYPT::getSessionCache($cacheName, 600);
         if (isset($cache)) {
+            $userCanWatchVideoReason = "Cached session result found for user $users_id and video $videos_id";
             return $cache;
         }
 
         $plugins = Plugin::getAllEnabled();
         $resp = Video::userGroupAndVideoGroupMatch($users_id, $videos_id);
         $video = new Video("", "", $videos_id);
+
         if (empty($video)) {
+            $userCanWatchVideoReason = "Video with ID $videos_id does not exist";
             _error_log("userCanWatchVideo: the usergroup and the video group does not match, User = $users_id, video = $videos_id)");
             $userCanWatchVideoFunction[$users_id][$videos_id] = false;
             ObjectYPT::setSessionCache($cacheName, false);
             return false;
         }
-        // check if the video is for paid plans only
+
+        // Check if the video is for paid plans only
         if ($video->getOnly_for_paid()) {
+            $userCanWatchVideoReason = "Video with ID $videos_id is marked as Only_for_paid";
             _error_log("userCanWatchVideo: the video ({$videos_id}) is set Only_for_paid = true)");
             $resp = false;
         }
+
         foreach ($plugins as $value) {
             self::YPTstart();
             $p = static::loadPlugin($value['dirName']);
@@ -1607,12 +1614,14 @@ class AVideoPlugin
                 $can = $p->userCanWatchVideo($users_id, $videos_id);
                 if (!empty($can)) {
                     if ($can < 0) {
+                        $userCanWatchVideoReason = "Plugin {$value['dirName']} disapproved access for user $users_id to video $videos_id";
                         if (!empty($users_id) && isVideo()) {
                             _error_log("userCanWatchVideo: DENIED The plugin {$value['dirName']} said the user ({$users_id}) can NOT watch the video ({$videos_id})");
                         }
                         $resp = false;
                     }
                     if ($can > 0) {
+                        $userCanWatchVideoReason = "Plugin {$value['dirName']} approved access for user $users_id to video $videos_id";
                         if (!empty($users_id) && isVideo()) {
                             _error_log("userCanWatchVideo: SUCCESS The plugin {$value['dirName']} said the user ({$users_id}) can watch the video ({$videos_id})");
                         }
@@ -1624,7 +1633,9 @@ class AVideoPlugin
             }
             self::YPTend("{$value['dirName']}::" . __FUNCTION__);
         }
+
         if (!empty($users_id)) {
+            $userCanWatchVideoReason = "No plugins approved or disaprove access for user $users_id to video $videos_id";
             //_error_log("userCanWatchVideo: No plugins approve user ({$users_id}) watch the video ({$videos_id}) ");
         }
         $userCanWatchVideoFunction[$users_id][$videos_id] = $resp;
@@ -1632,9 +1643,11 @@ class AVideoPlugin
         return $resp;
     }
 
+
     public static function userCanWatchVideoWithAds($users_id, $videos_id)
     {
-        global $userCanWatchVideoWithAdsFunction;
+        global $userCanWatchVideoWithAdsFunction, $userCanWatchVideoWithAdsReason; // Add global variable for the reason
+
         $users_id = intval($users_id);
         if (!isset($userCanWatchVideoWithAdsFunction)) {
             $userCanWatchVideoWithAdsFunction = [];
@@ -1643,10 +1656,13 @@ class AVideoPlugin
             $userCanWatchVideoWithAdsFunction[$users_id] = [];
         }
         if (isset($userCanWatchVideoWithAdsFunction[$users_id][$videos_id])) {
+            $userCanWatchVideoWithAdsReason = "Cached result found for user $users_id and video $videos_id";
             return $userCanWatchVideoWithAdsFunction[$users_id][$videos_id];
         }
+
         $plugins = Plugin::getAllEnabled();
         $resp = Video::userGroupAndVideoGroupMatch($users_id, $videos_id);
+
         foreach ($plugins as $value) {
             self::YPTstart();
             $p = static::loadPlugin($value['dirName']);
@@ -1654,22 +1670,33 @@ class AVideoPlugin
                 $can = $p->userCanWatchVideoWithAds($users_id, $videos_id);
                 if (!empty($can)) {
                     $resp = $can > 0 ? true : false;
+
                     if ($resp) {
+                        $userCanWatchVideoWithAdsReason = "Plugin {$value['dirName']} approved access for user $users_id to video $videos_id with ads";
                         if (!empty($users_id)) {
                             _error_log("userCanWatchVideoWithAds the plugin ({$value['dirName']}) said user ({$users_id}) can watch");
                         }
                         $userCanWatchVideoWithAdsFunction[$users_id][$videos_id] = true;
                         return true;
                     } else {
-                        //_error_log("userCanWatchVideoWithAds: users_id = $users_id, videos_id = $videos_id {$value['dirName']} said no");
+                        $userCanWatchVideoWithAdsReason = "Plugin {$value['dirName']} disapproved access for user $users_id to video $videos_id with ads";
+                        _error_log("userCanWatchVideoWithAds: DENIED by plugin ({$value['dirName']}) for user $users_id and video $videos_id");
                     }
                 }
             }
             self::YPTend("{$value['dirName']}::" . __FUNCTION__);
         }
+
+        if ($resp) {
+            $userCanWatchVideoWithAdsReason = "User group and video group match for user $users_id and video $videos_id";
+        } else {
+            $userCanWatchVideoWithAdsReason = "No plugins approved access and no user group match for user $users_id and video $videos_id";
+        }
+
         $userCanWatchVideoWithAdsFunction[$users_id][$videos_id] = $resp;
         return $resp;
     }
+
 
     public static function showAds($videos_id)
     {
@@ -1740,6 +1767,8 @@ class AVideoPlugin
      */
     public static function getVideo()
     {
+        global $_plugin_getVideo;
+        $_plugin_getVideo = '';
         $plugins = Plugin::getAllEnabled();
         $resp = null;
         foreach ($plugins as $value) {
@@ -1748,6 +1777,7 @@ class AVideoPlugin
             if (is_object($p)) {
                 $video = $p->getVideo();
                 if (!empty($video)) {
+                    $_plugin_getVideo = $value['dirName'];
                     return $video;
                 }
             }
@@ -1826,7 +1856,7 @@ class AVideoPlugin
 
     public static function onUserSocketConnect()
     {
-        _mysql_connect();
+        //_mysql_connect();
         $plugins = Plugin::getAllEnabled();
         foreach ($plugins as $value) {
             self::YPTstart();
@@ -1836,12 +1866,12 @@ class AVideoPlugin
             }
             self::YPTend("{$value['dirName']}::" . __FUNCTION__);
         }
-        _mysql_close();
+        //_mysql_close();
     }
 
     public static function onUserSocketDisconnect()
     {
-        _mysql_connect();
+        //_mysql_connect();
         $plugins = Plugin::getAllEnabled();
         foreach ($plugins as $value) {
             self::YPTstart();
@@ -1851,7 +1881,7 @@ class AVideoPlugin
             }
             self::YPTend("{$value['dirName']}::" . __FUNCTION__);
         }
-        _mysql_close();
+        //_mysql_close();
     }
 
     public static function thumbsOverlay($videos_id)
@@ -1901,7 +1931,8 @@ class AVideoPlugin
 
     public static function getVideoTags($videos_id)
     {
-        global $global, $advancedCustom;
+        global $global, $advancedCustom, $mysql_connect_is_persistent;
+        $mysql_connect_is_persistent = 1;
         $tolerance = 0.1;
         if (empty($videos_id) || !empty($global['disableVideoTags']) || !empty($advancedCustom->disableVideoTags)) {
             return [];
@@ -1915,10 +1946,10 @@ class AVideoPlugin
         if (isset($_getVideoTags[$videos_id])) {
             $array = $_getVideoTags[$videos_id];
         } else {
-            
-            $cacheSuffix = 'getVideoTags';            
+
+            $cacheSuffix = 'getVideoTags';
             $videoCache = new VideoCacheHandler('', $videos_id);
-            $array = $videoCache->getCache($cacheSuffix,rand(86400, 864000));
+            $array = $videoCache->getCache($cacheSuffix, rand(86400, 864000));
 
             //$name = "getVideoTags{$videos_id}";
             //$array = ObjectYPT::getCache($name, 86400);
@@ -1939,7 +1970,7 @@ class AVideoPlugin
                     TimeLogEnd($TimeLog, __LINE__, $tolerance);
                 }
                 TimeLogEnd("AVideoPlugin::getVideoTags($videos_id)", __LINE__, $tolerance * 2);
-                
+
                 $videoCache->setCache($array);
                 //ObjectYPT::setCache($name, $array);
                 $_getVideoTags[$videos_id] = $array;
@@ -2932,18 +2963,21 @@ class AVideoPlugin
             ]
      * @return $file
      */
-    public static function modifyURL($file, $videos_id=0)
+    public static function modifyURL($file, $videos_id = 0)
     {
         global $global;
         if (empty($global)) {
             $global = [];
         }
+        if(!empty($global['skipModifyURL'])){
+            return $file;
+        }
         $plugins = Plugin::getAllEnabled();
-        if(empty($videos_id)){
+        if (empty($videos_id)) {
             $videos_id = 0;
-            if(!empty($file['filename'])){
+            if (!empty($file['filename'])) {
                 $videos_id = getVideos_IdFromFilename($file['filename']);
-            }else{
+            } else {
                 $videos_id = getVideos_id();
             }
         }
@@ -3115,8 +3149,8 @@ class AVideoPlugin
         }
         return $name;
     }
-    
-    
+
+
     public static function executeEveryMinute()
     {
         $plugins = Plugin::getAllEnabled();
@@ -3156,7 +3190,7 @@ class AVideoPlugin
             self::YPTend("{$value['dirName']}::" . __FUNCTION__);
         }
     }
-    
+
     public static function executeEveryMonth()
     {
         $plugins = Plugin::getAllEnabled();
@@ -3177,7 +3211,7 @@ class AVideoPlugin
             self::YPTstart();
             $p = static::loadPlugin($value['dirName']);
             if (is_object($p)) {
-                if(!$p->canRecordVideo($key)){
+                if (!$p->canRecordVideo($key)) {
                     _error_log("{$value['dirName']} said you cannot record this key $key");
                     return false;
                 }
@@ -3194,7 +3228,7 @@ class AVideoPlugin
             self::YPTstart();
             $p = static::loadPlugin($value['dirName']);
             if (is_object($p)) {
-                if(!$p->canNotifyVideo($key)){
+                if (!$p->canNotifyVideo($key)) {
                     _error_log("{$value['dirName']} said you cannot notify this key $key");
                     return false;
                 }
@@ -3212,8 +3246,8 @@ class AVideoPlugin
             self::YPTstart();
             $p = static::loadPlugin($value['dirName']);
             if (is_object($p)) {
-                if($p->videoHLSProtectionByPass($videos_id)){
-                    $_useDownloadProtectionReason[] = " videoHLSProtectionByPass {$videos_id} Plugin {$value['dirName']} return true ".__LINE__;
+                if ($p->videoHLSProtectionByPass($videos_id)) {
+                    $_useDownloadProtectionReason[] = " videoHLSProtectionByPass {$videos_id} Plugin {$value['dirName']} return true " . __LINE__;
                     return true;
                 }
             }
@@ -3226,7 +3260,7 @@ class AVideoPlugin
     public static function decodeAToken()
     {
         $atoken = getAToken();
-        if(empty($atoken)){
+        if (empty($atoken)) {
             return false;
         }
         $plugins = Plugin::getAllEnabled();
@@ -3235,7 +3269,7 @@ class AVideoPlugin
             $p = static::loadPlugin($value['dirName']);
             if (is_object($p)) {
                 $resp = $p->decodeAToken();
-                if(!empty($resp)){
+                if (!empty($resp)) {
                     return $resp;
                 }
             }
@@ -3259,9 +3293,7 @@ class AVideoPlugin
     }
 }
 
-class YouPHPTubePlugin extends AVideoPlugin
-{
-}
+class YouPHPTubePlugin extends AVideoPlugin {}
 
 function getLiveApplicationArrayCMP($a, $b)
 {

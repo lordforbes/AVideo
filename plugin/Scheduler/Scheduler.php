@@ -296,13 +296,13 @@ class Scheduler extends PluginAbstract
     }
 
     /**
-     * 
+     *
      * @global array $global
      * @param string $title
      * @param string $description
      * @param string $date_start
      * @param string $date_end
-     * 
+     *
      *  description - string description of the event.
         dtend - date/time stamp designating the end of the event. You can use either a DateTime object or a PHP datetime format string (e.g. "now + 1 hour").
         dtstart - date/time stamp designating the start of the event. You can use either a DateTime object or a PHP datetime format string (e.g. "now + 1 hour").
@@ -578,6 +578,7 @@ class Scheduler extends PluginAbstract
 
     function executeEveryDay()
     {
+        global $global;
         $obj = AVideoPlugin::getDataObject('Scheduler');
         if (!empty($obj->deleteOldUselessVideos)) {
             Video::deleteUselessOldVideos(30);
@@ -590,6 +591,7 @@ class Scheduler extends PluginAbstract
 
     function deleteOldFiles($directory = '/var/www/tmp', $days = 7)
     {
+        global $global;
         // Check if the directory exists
         if (!is_dir($directory)) {
             _error_log("Directory does not exist: $directory");
@@ -601,6 +603,8 @@ class Scheduler extends PluginAbstract
 
         // Define the time limit in seconds (days * 24 * 60 * 60)
         $timeLimit = $days * 24 * 60 * 60;
+
+        execAsync("php {$global['systemRootPath']}install/cleanup_systemd-private.php");
 
         // Open the directory
         if ($handle = opendir($directory)) {
@@ -646,15 +650,15 @@ class Scheduler extends PluginAbstract
 
         // Ensure the logfile is not empty and has a .log extension
         if (empty($logFilePath)) {
-            _error_log("Log file path is empty; no action required.");
+            _error_log("manageLogFile: Log file path is empty; no action required.");
             return;
         }
 
         if (pathinfo($logFilePath, PATHINFO_EXTENSION) !== 'log') {
-            _error_log("Log file path is not a .log file; no action required. [$logFilePath]");
+            _error_log("manageLogFile: Log file path is not a .log file; no action required. [$logFilePath]");
             return;
         }
-        
+
         // Get yesterday's date
         $yesterdayDate = date('Y-m-d', strtotime('-1 day'));
 
@@ -663,28 +667,55 @@ class Scheduler extends PluginAbstract
 
         // Check if the current logfile exists
         if (file_exists($logFilePath)) {
-            // Move the current logfile to a new file with yesterday's date
-            if (rename($logFilePath, $newLogFileName)) {
-                _error_log("Log file successfully moved to: $newLogFileName");
+            // Get the original log file size
+            $originalSize = filesize($logFilePath);
+
+            // Ensure log content is preserved before rotation
+            if (!file_exists($newLogFileName)) {
+                if (copy($logFilePath, $newLogFileName)) {
+                    $copiedSize = filesize($newLogFileName);
+
+                    // Log file sizes for verification
+                    _error_log("manageLogFile: Log file successfully copied to: $newLogFileName (Original size: $originalSize bytes, Copied size: $copiedSize bytes)");
+
+                    // Verify file sizes match
+                    if ($originalSize !== $copiedSize) {
+                        _error_log("manageLogFile: WARNING - File size mismatch after copying! Original: $originalSize bytes, Copied: $copiedSize bytes");
+                        return; // Stop execution if copy failed
+                    }
+                } else {
+                    _error_log("manageLogFile: Failed to copy log file to: $newLogFileName");
+                    return; // Stop execution if copying failed
+                }
             } else {
-                _error_log("Failed to move log file to: $newLogFileName");
+                _error_log("manageLogFile: Log file already exists, skipping copy: $newLogFileName");
+            }
+
+            // Clear the original log file only if copy was successful and verified
+            if (file_put_contents($logFilePath, "") !== false) {
+                _error_log("manageLogFile: Log file successfully cleared: $logFilePath");
+            } else {
+                _error_log("manageLogFile: Failed to clear log file: $logFilePath");
+                return; // Stop execution if clearing failed
             }
         } else {
-            _error_log("Log file does not exist: $logFilePath");
+            _error_log("manageLogFile: Log file does not exist: $logFilePath");
         }
 
-        // Create a new empty logfile
-        if (touch($logFilePath)) {
-            _error_log("New log file created: $logFilePath");
+        // Ensure a new empty logfile is created
+        if (!file_exists($logFilePath)) {
+            if (touch($logFilePath)) {
+                _error_log("manageLogFile: New log file created: $logFilePath");
 
-            // Ensure Apache can write to the new log file
-            if (chmod($logFilePath, 0666)) {
-                _error_log("Permissions set to 0666 for: $logFilePath");
+                // Ensure Apache/PHP can write to the new log file
+                if (chmod($logFilePath, 0666)) {
+                    _error_log("manageLogFile: Permissions set to 0666 for: $logFilePath");
+                } else {
+                    _error_log("manageLogFile: Failed to set permissions for: $logFilePath");
+                }
             } else {
-                _error_log("Failed to set permissions for: $logFilePath");
+                _error_log("manageLogFile: Failed to create new log file: $logFilePath");
             }
-        } else {
-            _error_log("Failed to create new log file: $logFilePath");
         }
 
         // Delete log files older than 30 days in the same directory
@@ -696,9 +727,9 @@ class Scheduler extends PluginAbstract
         foreach ($files as $file) {
             if (filemtime($file) < $thirtyDaysAgo) {
                 if (unlink($file)) {
-                    _error_log("Deleted old log file: $file");
+                    _error_log("manageLogFile: Deleted old log file: $file");
                 } else {
-                    _error_log("Failed to delete old log file: $file");
+                    _error_log("manageLogFile: Failed to delete old log file: $file");
                 }
             }
         }

@@ -1,8 +1,3 @@
-<?php
-if (!empty($obj->experimentalWebcam)) {
-    include $global['systemRootPath'] . 'plugin/Live/tabs/experimentalWebCam.php';
-}
-?>
 <div class="clear clearfix"></div>
 
 <div class="tabbable-line <?php echo getCSSAnimationClassAndStyle('animate__fadeInRight', 'live'); ?>"  id="indexTabs">
@@ -33,7 +28,7 @@ if (!empty($obj->experimentalWebcam)) {
             <?php
             $active = '';
         }
-        
+
         ?>
     </ul>
     <div class="tab-content">
@@ -41,7 +36,7 @@ if (!empty($obj->experimentalWebcam)) {
         $active = 'in active';
         if (Live::canRestream()) {
             ?>
-            <div id="tabRestream" class="tab-pane fade <?php echo $active; ?>"> 
+            <div id="tabRestream" class="tab-pane fade <?php echo $active; ?>">
                 <?php include $global['systemRootPath'] . 'plugin/Live/view/Live_restreams/livePanel.php'; ?>
             </div>
             <?php
@@ -61,7 +56,7 @@ if (!empty($obj->experimentalWebcam)) {
 
         if (empty($objLive->hideShare)) {
             ?>
-            <div id="tabShare" class="tab-pane fade <?php echo $active; ?>"> 
+            <div id="tabShare" class="tab-pane fade <?php echo $active; ?>">
                 <?php
                 include $global['systemRootPath'] . 'plugin/Live/tabs/tabShare.php';
                 $active = '';
@@ -71,7 +66,7 @@ if (!empty($obj->experimentalWebcam)) {
         }
         if (User::isAdmin()) {
             ?>
-            <div id="tabLiveAdmin" class="tab-pane fade <?php echo $active; ?>"> 
+            <div id="tabLiveAdmin" class="tab-pane fade <?php echo $active; ?>">
                 <?php
                 include $global['systemRootPath'] . 'plugin/Live/tabs/tabAdmin.php';
                 $active = '';
@@ -81,8 +76,8 @@ if (!empty($obj->experimentalWebcam)) {
         }
         ?>
 
-    </div> 
-</div>  
+    </div>
+</div>
 <div class="<?php echo getCSSAnimationClassAndStyle('animate__fadeInRight', 'live'); ?>">
     <?php
     AVideoPlugin::getLivePanel();
