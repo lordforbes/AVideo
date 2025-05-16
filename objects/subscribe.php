@@ -226,6 +226,11 @@ class Subscribe extends ObjectYPT{
                     $row['backgroundURL'] = User::getBackground($row['subscriber_id']);
                     $row['photoURL'] = User::getPhoto($row['subscriber_id']);
 
+
+                    $row['channel_identification'] = User::getNameIdentificationById($row['users_id']);
+                    $row['channel_backgroundURL'] = User::getBackground($row['users_id']);
+                    $row['channel_photoURL'] = User::getPhoto($row['users_id']);
+
                     $subscribe[] = $row;
                 }
                 //$subscribe = $res->fetch_all(MYSQLI_ASSOC);
@@ -308,7 +313,7 @@ class Subscribe extends ObjectYPT{
     public static function getTotalSubscribes($user_id = 0)
     {
         global $global;
-        $sql = "SELECT id FROM subscribes WHERE status = 'a' AND subscriber_users_id > 0 ";
+        $sql = "SELECT id FROM subscribes WHERE status = 'a' AND users_id > 0 ";
         if (!empty($user_id)) {
             $sql .= " AND users_id = '{$user_id}' ";
         }
